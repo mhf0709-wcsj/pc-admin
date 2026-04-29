@@ -9,7 +9,7 @@
     "dev": "node src/app.js"
   },
   "dependencies": {
-    "@cloudbase/node-sdk": "^2.16.0",
+    "@cloudbase/node-sdk": "^3.18.1",
     "axios": "^1.6.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
