@@ -11,11 +11,12 @@ function splitOrigins(value) {
 module.exports = {
   port: Number(process.env.PORT || 3001),
   corsOrigins: splitOrigins(process.env.CORS_ORIGIN),
-  tcb: {
-    env: process.env.TCB_ENV_ID || '',
-    secretId: process.env.TCB_SECRET_ID || '',
-    secretKey: process.env.TCB_SECRET_KEY || '',
-    sessionToken: process.env.TCB_SESSION_TOKEN || ''
+  mysql: {
+    host: process.env.MYSQL_HOST || '127.0.0.1',
+    port: Number(process.env.MYSQL_PORT || 3306),
+    user: process.env.MYSQL_USER || 'pc_admin',
+    password: process.env.MYSQL_PASSWORD || '',
+    database: process.env.MYSQL_DATABASE || 'pressure_admin'
   },
   dashscope: {
     apiKey: process.env.DASHSCOPE_API_KEY || '',

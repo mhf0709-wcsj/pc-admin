@@ -1,4 +1,5 @@
-const { db, _ } = require('../lib/cloudbase')
+const crypto = require('crypto')
+const { query, one, exec } = require('../lib/db')
 const {
   formatDate,
   formatDateTime,
@@ -9,9 +10,22 @@ const {
   calculateExpiryDate
 } = require('../utils/dates')
 
+function id(prefix) {
+  return `${prefix}_${crypto.randomUUID()}`
+}
+
+function toBool(value) {
+  return value ? 1 : 0
+}
+
+function normalizeRow(row) {
+  if (!row) return null
+  return { ...row, _id: row.id }
+}
+
 function normalizeAdmin(admin) {
   return {
-    id: admin._id,
+    id: admin.id,
     username: admin.username,
     role: admin.role || 'admin',
     district: admin.district || ''
@@ -20,41 +34,13 @@ function normalizeAdmin(admin) {
 
 function normalizeEnterprise(enterprise) {
   return {
-    id: enterprise._id,
+    id: enterprise.id,
     companyName: enterprise.companyName || enterprise.enterpriseName || '',
     phone: enterprise.phone || enterprise.contactPhone || enterprise.legalPersonPhone || '',
     legalPerson: enterprise.legalPerson || enterprise.contact || '',
     creditCode: enterprise.creditCode || '',
     district: enterprise.district || ''
   }
-}
-
-async function getAdminByCredential(username, password) {
-  const result = await db.collection('admins').where({ username, password }).limit(1).get()
-  return result.data && result.data.length ? result.data[0] : null
-}
-
-async function fetchAll(collectionName, whereCondition = null, orderByField = 'createTime', direction = 'desc') {
-  const pageSize = 100
-  let skip = 0
-  let all = []
-
-  while (true) {
-    let query = db.collection(collectionName)
-    if (whereCondition && Object.keys(whereCondition).length > 0) {
-      query = query.where(whereCondition)
-    }
-    if (orderByField) {
-      query = query.orderBy(orderByField, direction)
-    }
-    const res = await query.skip(skip).limit(pageSize).get()
-    const batch = res.data || []
-    all = all.concat(batch)
-    if (batch.length < pageSize) break
-    skip += pageSize
-  }
-
-  return all
 }
 
 function matchKeyword(fields, keyword) {
@@ -65,24 +51,50 @@ function matchKeyword(fields, keyword) {
 }
 
 function buildScopedWhere(admin) {
-  const condition = {}
+  const clauses = []
+  const params = {}
   if (admin && admin.role === 'district' && admin.district) {
-    condition.district = admin.district
+    clauses.push('district = :district')
+    params.district = admin.district
   }
-  return condition
+  return { clauses, params }
 }
 
-function buildScopedRecordWhere(admin) {
-  return Object.assign({}, buildScopedWhere(admin), { isDeleted: false })
-}
-
-function buildEnterpriseWhere(enterprise) {
+function buildEnterpriseScope(enterprise) {
   const companyName = enterprise.companyName || enterprise.enterpriseName || ''
   if (!companyName) throw new Error('缺少企业身份')
-  return {
-    enterpriseName: companyName,
-    isDeleted: false
-  }
+  return companyName
+}
+
+async function listRows(table, options = {}) {
+  const clauses = [...(options.clauses || [])]
+  const params = { ...(options.params || {}) }
+  const orderBy = options.orderBy || 'createTime'
+  const direction = String(options.direction || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  return query(`SELECT * FROM ${table} ${whereSql} ORDER BY ${orderBy} ${direction}`, params)
+}
+
+async function getAdminByCredential(username, password) {
+  return one(
+    'SELECT * FROM admins WHERE username = :username AND password = :password LIMIT 1',
+    { username, password }
+  )
+}
+
+async function updateById(table, rowId, data) {
+  const keys = Object.keys(data).filter((key) => data[key] !== undefined)
+  if (!keys.length) return
+  const sets = keys.map((key) => `${key} = :${key}`).join(', ')
+  await exec(`UPDATE ${table} SET ${sets} WHERE id = :id`, { ...data, id: rowId })
+}
+
+async function insertRow(table, data) {
+  const keys = Object.keys(data)
+  const fields = keys.join(', ')
+  const placeholders = keys.map((key) => `:${key}`).join(', ')
+  await exec(`INSERT INTO ${table} (${fields}) VALUES (${placeholders})`, data)
+  return data
 }
 
 async function handleLogin(payload = {}) {
@@ -108,20 +120,21 @@ async function handleChangePassword(payload = {}) {
   const target = await getAdminByCredential(admin.username, oldPassword)
   if (!target) throw new Error('原密码错误')
 
-  await db.collection('admins').doc(target._id).update({
-    data: { password: newPassword, updateTime: new Date() }
+  await updateById('admins', target.id, {
+    password: newPassword,
+    updateTime: formatDateTime()
   })
   return { success: true }
 }
 
 async function handleGetDashboard(payload = {}) {
   const admin = payload.admin || {}
-  const whereCondition = buildScopedWhere(admin)
-  const recordWhereCondition = buildScopedRecordWhere(admin)
-  const [records, enterprises] = await Promise.all([
-    fetchAll('pressure_records', recordWhereCondition, 'createTime', 'desc'),
-    fetchAll('enterprises', whereCondition, 'createTime', 'desc')
-  ])
+  const scoped = buildScopedWhere(admin)
+  const records = await listRows('pressure_records', {
+    clauses: [...scoped.clauses, 'isDeleted = 0'],
+    params: scoped.params
+  })
+  const enterprises = await listRows('enterprises', scoped)
 
   let expiredCount = 0
   let expiringCount = 0
@@ -166,9 +179,7 @@ async function handleGetDashboard(payload = {}) {
   const enterprisePhoneMap = new Map()
   enterprises.forEach((item) => {
     const name = item.companyName || item.enterpriseName
-    if (name) {
-      enterprisePhoneMap.set(name, item.phone || item.contactPhone || item.legalPersonPhone || '')
-    }
+    if (name) enterprisePhoneMap.set(name, item.phone || item.contactPhone || item.legalPersonPhone || '')
   })
 
   const focusEnterprises = Array.from(riskMap.values())
@@ -181,7 +192,7 @@ async function handleGetDashboard(payload = {}) {
     .slice(0, 8)
 
   const recentRecords = records.slice(0, 8).map((item) => ({
-    _id: item._id,
+    _id: item.id,
     certNo: item.certNo || '',
     factoryNo: item.factoryNo || '',
     enterpriseName: item.enterpriseName || '',
@@ -207,8 +218,11 @@ async function handleGetDashboard(payload = {}) {
 
 async function handleGetRecords(payload = {}) {
   const admin = payload.admin || {}
-  const whereCondition = buildScopedRecordWhere(admin)
-  const records = await fetchAll('pressure_records', whereCondition, 'createTime', 'desc')
+  const scoped = buildScopedWhere(admin)
+  const records = await listRows('pressure_records', {
+    clauses: [...scoped.clauses, 'isDeleted = 0'],
+    params: scoped.params
+  })
 
   const keyword = String(payload.keyword || '').trim()
   const district = String(payload.district || '').trim()
@@ -241,7 +255,7 @@ async function handleGetRecords(payload = {}) {
   })
 
   const list = filtered.slice((page - 1) * pageSize, page * pageSize).map((item) => ({
-    _id: item._id,
+    _id: item.id,
     certNo: item.certNo || '',
     factoryNo: item.factoryNo || '',
     enterpriseName: item.enterpriseName || '',
@@ -260,11 +274,10 @@ async function handleGetRecords(payload = {}) {
 
 async function handleGetEnterprises(payload = {}) {
   const admin = payload.admin || {}
-  const whereCondition = buildScopedWhere(admin)
-  const recordWhereCondition = buildScopedRecordWhere(admin)
+  const scoped = buildScopedWhere(admin)
   const [records, enterprises] = await Promise.all([
-    fetchAll('pressure_records', recordWhereCondition, 'createTime', 'desc'),
-    fetchAll('enterprises', whereCondition, 'createTime', 'desc')
+    listRows('pressure_records', { clauses: [...scoped.clauses, 'isDeleted = 0'], params: scoped.params }),
+    listRows('enterprises', scoped)
   ])
 
   const keyword = String(payload.keyword || '').trim()
@@ -285,7 +298,7 @@ async function handleGetEnterprises(payload = {}) {
       const companyName = item.companyName || item.enterpriseName || ''
       const stats = recordMap.get(companyName) || { totalRecords: 0, expiredCount: 0, expiringCount: 0 }
       return {
-        _id: item._id,
+        _id: item.id,
         companyName,
         district: item.district || '',
         phone: item.phone || item.contactPhone || item.legalPersonPhone || '',
@@ -312,12 +325,15 @@ async function handleEnterpriseLogin(payload = {}) {
   const phone = String(payload.phone || '').trim()
   if (!companyName || !phone) throw new Error('请输入企业名称和法人手机号')
 
-  const result = await db.collection('enterprises').where({ companyName, phone }).limit(1).get()
-  const enterprise = result.data && result.data.length ? result.data[0] : null
+  const enterprise = await one(
+    'SELECT * FROM enterprises WHERE companyName = :companyName AND phone = :phone LIMIT 1',
+    { companyName, phone }
+  )
   if (!enterprise) throw new Error('企业名称或手机号不匹配')
 
-  await db.collection('enterprises').doc(enterprise._id).update({
-    data: { lastLoginTime: new Date(), updateTime: new Date() }
+  await updateById('enterprises', enterprise.id, {
+    lastLoginTime: formatDateTime(),
+    updateTime: formatDateTime()
   })
 
   return {
@@ -339,45 +355,42 @@ async function handleEnterpriseRegister(payload = {}) {
   if (!/^1[3-9]\d{9}$/.test(phone)) throw new Error('请输入正确的法人手机号')
   if (!district) throw new Error('请选择辖区')
 
-  const [companyRes, creditRes, phoneRes] = await Promise.all([
-    db.collection('enterprises').where({ companyName }).limit(1).get(),
-    db.collection('enterprises').where({ creditCode }).limit(1).get(),
-    db.collection('enterprises').where({ phone }).limit(1).get()
-  ])
+  const duplicate = await one(
+    'SELECT * FROM enterprises WHERE companyName = :companyName OR creditCode = :creditCode OR phone = :phone LIMIT 1',
+    { companyName, creditCode, phone }
+  )
+  if (duplicate?.companyName === companyName) throw new Error('该企业已注册')
+  if (duplicate?.creditCode === creditCode) throw new Error('该统一社会信用代码已存在')
+  if (duplicate?.phone === phone) throw new Error('该手机号已被注册')
 
-  if (companyRes.data && companyRes.data.length) throw new Error('该企业已注册')
-  if (creditRes.data && creditRes.data.length) throw new Error('该统一社会信用代码已存在')
-  if (phoneRes.data && phoneRes.data.length) throw new Error('该手机号已被注册')
-
-  const now = new Date()
-  const addRes = await db.collection('enterprises').add({
-    data: {
-      companyName,
-      creditCode,
-      legalPerson,
-      phone,
-      district,
-      createTime: now,
-      updateTime: now,
-      lastLoginTime: now,
-      authType: 'web'
-    }
-  })
-  const docRes = await db.collection('enterprises').doc(addRes._id).get()
+  const now = formatDateTime()
+  const row = {
+    id: id('ent'),
+    companyName,
+    creditCode,
+    legalPerson,
+    phone,
+    district,
+    authType: 'web',
+    createTime: now,
+    updateTime: now,
+    lastLoginTime: now
+  }
+  await insertRow('enterprises', row)
   return {
-    enterprise: normalizeEnterprise(docRes.data),
+    enterprise: normalizeEnterprise(row),
     token: `web_enterprise_${Date.now()}`
   }
 }
 
 async function handleGetEnterpriseDashboard(payload = {}) {
   const enterprise = payload.enterprise || {}
-  const companyName = enterprise.companyName || ''
+  const companyName = buildEnterpriseScope(enterprise)
   const today = startOfToday()
   const [equipments, gauges, records] = await Promise.all([
-    fetchAll('equipments', { enterpriseName: companyName, isDeleted: false }, 'createTime', 'desc'),
-    fetchAll('devices', { enterpriseName: companyName, isDeleted: false }, 'createTime', 'desc'),
-    fetchAll('pressure_records', { enterpriseName: companyName, isDeleted: false }, 'createTime', 'desc')
+    listRows('equipments', { clauses: ['enterpriseName = :companyName', 'isDeleted = 0'], params: { companyName } }),
+    listRows('devices', { clauses: ['enterpriseName = :companyName', 'isDeleted = 0'], params: { companyName } }),
+    listRows('pressure_records', { clauses: ['enterpriseName = :companyName', 'isDeleted = 0'], params: { companyName } })
   ])
 
   const expiredCount = records.filter((item) => isExpiredDate(item.expiryDate)).length
@@ -395,7 +408,7 @@ async function handleGetEnterpriseDashboard(payload = {}) {
       unboundCount
     },
     recentRecords: records.slice(0, 8).map((item) => ({
-      _id: item._id,
+      _id: item.id,
       certNo: item.certNo || '',
       factoryNo: item.factoryNo || '',
       instrumentName: item.instrumentName || '',
@@ -409,7 +422,7 @@ async function handleGetEnterpriseDashboard(payload = {}) {
       .filter((item) => Number(item.gaugeCount || 0) === 0)
       .slice(0, 8)
       .map((item) => ({
-        _id: item._id,
+        _id: item.id,
         equipmentName: item.equipmentName || '',
         equipmentNo: item.equipmentNo || '',
         location: item.location || ''
@@ -418,14 +431,17 @@ async function handleGetEnterpriseDashboard(payload = {}) {
 }
 
 async function handleGetEnterpriseEquipments(payload = {}) {
-  const enterprise = payload.enterprise || {}
+  const companyName = buildEnterpriseScope(payload.enterprise || {})
   const keyword = String(payload.keyword || '').trim()
-  const list = await fetchAll('equipments', buildEnterpriseWhere(enterprise), 'createTime', 'desc')
+  const list = await listRows('equipments', {
+    clauses: ['enterpriseName = :companyName', 'isDeleted = 0'],
+    params: { companyName }
+  })
   return {
     list: list
       .filter((item) => matchKeyword([item.equipmentName, item.equipmentNo, item.location], keyword))
       .map((item) => ({
-        _id: item._id,
+        _id: item.id,
         equipmentName: item.equipmentName || '',
         equipmentNo: item.equipmentNo || '',
         location: item.location || '',
@@ -439,75 +455,75 @@ async function handleGetEnterpriseEquipments(payload = {}) {
 async function handleSaveEnterpriseEquipment(payload = {}) {
   const enterprise = payload.enterprise || {}
   const data = payload.data || {}
-  const companyName = enterprise.companyName || ''
-  const now = formatDateTime(new Date())
+  const companyName = buildEnterpriseScope(enterprise)
+  const now = formatDateTime()
   const equipmentName = String(data.equipmentName || '').trim()
-
-  if (!companyName) throw new Error('缺少企业身份')
   if (!equipmentName) throw new Error('请输入设备名称')
 
   const doc = {
     equipmentNo: String(data.equipmentNo || '').trim() || `EQ-${Date.now()}`,
     equipmentName,
+    enterpriseId: enterprise.id || '',
     enterpriseName: companyName,
     district: data.district || enterprise.district || '',
     location: data.location || '',
     gaugeCount: Number(data.gaugeCount || 0),
-    isDeleted: false,
+    isDeleted: 0,
     updateTime: now
   }
 
   if (data._id) {
-    await db.collection('equipments').doc(data._id).update({ data: doc })
+    await updateById('equipments', data._id, doc)
     return { _id: data._id, ...doc }
   }
 
-  const res = await db.collection('equipments').add({
-    data: {
-      ...doc,
-      deletedAt: '',
-      deletedBy: '',
-      deletedById: '',
-      createTime: now
-    }
-  })
-  return { _id: res._id, ...doc }
+  const row = {
+    id: id('eq'),
+    ...doc,
+    deletedAt: '',
+    deletedBy: '',
+    deletedById: '',
+    createTime: now
+  }
+  await insertRow('equipments', row)
+  return { _id: row.id, ...doc }
 }
 
 async function handleDeleteEnterpriseEquipment(payload = {}) {
   const enterprise = payload.enterprise || {}
-  const id = String(payload.id || '').trim()
-  if (!id) throw new Error('缺少设备ID')
+  const targetId = String(payload.id || '').trim()
+  if (!targetId) throw new Error('缺少设备ID')
 
-  const current = await db.collection('equipments').doc(id).get()
-  if (!current.data || current.data.enterpriseName !== enterprise.companyName) {
+  const current = await one('SELECT * FROM equipments WHERE id = :id LIMIT 1', { id: targetId })
+  if (!current || current.enterpriseName !== enterprise.companyName) {
     throw new Error('无权删除该设备')
   }
 
-  const now = formatDateTime(new Date())
-  await db.collection('equipments').doc(id).update({
-    data: {
-      isDeleted: true,
-      deletedAt: now,
-      deletedBy: enterprise.companyName || '企业用户',
-      deletedById: enterprise.id || '',
-      updateTime: now
-    }
+  const now = formatDateTime()
+  await updateById('equipments', targetId, {
+    isDeleted: 1,
+    deletedAt: now,
+    deletedBy: enterprise.companyName || '企业用户',
+    deletedById: enterprise.id || '',
+    updateTime: now
   })
   return { success: true }
 }
 
 async function handleGetEnterpriseGauges(payload = {}) {
-  const enterprise = payload.enterprise || {}
+  const companyName = buildEnterpriseScope(payload.enterprise || {})
   const keyword = String(payload.keyword || '').trim()
   const status = String(payload.status || '').trim()
-  const list = await fetchAll('devices', buildEnterpriseWhere(enterprise), 'createTime', 'desc')
+  const list = await listRows('devices', {
+    clauses: ['enterpriseName = :companyName', 'isDeleted = 0'],
+    params: { companyName }
+  })
   return {
     list: list
       .filter((item) => !status || item.status === status)
       .filter((item) => matchKeyword([item.deviceName, item.deviceNo, item.factoryNo, item.equipmentName, item.modelSpec], keyword))
       .map((item) => ({
-        _id: item._id,
+        _id: item.id,
         deviceName: item.deviceName || '',
         deviceNo: item.deviceNo || '',
         factoryNo: item.factoryNo || '',
@@ -522,10 +538,13 @@ async function handleGetEnterpriseGauges(payload = {}) {
 }
 
 async function handleGetEnterpriseRecords(payload = {}) {
-  const enterprise = payload.enterprise || {}
+  const companyName = buildEnterpriseScope(payload.enterprise || {})
   const keyword = String(payload.keyword || '').trim()
   const filterType = String(payload.filterType || '').trim()
-  const records = await fetchAll('pressure_records', buildEnterpriseWhere(enterprise), 'createTime', 'desc')
+  const records = await listRows('pressure_records', {
+    clauses: ['enterpriseName = :companyName', 'isDeleted = 0'],
+    params: { companyName }
+  })
   return {
     list: records
       .filter((item) => {
@@ -536,7 +555,7 @@ async function handleGetEnterpriseRecords(payload = {}) {
       })
       .filter((item) => matchKeyword([item.certNo, item.factoryNo, item.instrumentName, item.equipmentName, item.deviceName], keyword))
       .map((item) => ({
-        _id: item._id,
+        _id: item.id,
         certNo: item.certNo || '',
         factoryNo: item.factoryNo || '',
         instrumentName: item.instrumentName || '',
@@ -554,13 +573,10 @@ async function handleSaveEnterpriseAiRecord(payload = {}) {
   const extractedData = payload.extractedData || {}
   const equipmentId = String(payload.equipmentId || '').trim()
   const fileID = String(payload.fileID || '').trim()
-  const companyName = enterprise.companyName || enterprise.enterpriseName || ''
-
-  if (!companyName) throw new Error('缺少企业身份')
+  const companyName = buildEnterpriseScope(enterprise)
   if (!equipmentId) throw new Error('请选择所属设备')
 
-  const equipmentRes = await db.collection('equipments').doc(equipmentId).get()
-  const equipment = equipmentRes.data
+  const equipment = await one('SELECT * FROM equipments WHERE id = :id LIMIT 1', { id: equipmentId })
   if (!equipment || equipment.isDeleted) throw new Error('所选设备不存在')
   if (equipment.enterpriseName !== companyName) throw new Error('无权使用该设备')
 
@@ -568,7 +584,9 @@ async function handleSaveEnterpriseAiRecord(payload = {}) {
   if (!parsedVerificationDate) throw new Error('请补全检定日期后再保存')
   const verificationDate = formatDate(parsedVerificationDate)
 
-  const now = formatDateTime(new Date())
+  const now = formatDateTime()
+  const deviceId = id('dev')
+  const recordId = id('rec')
   const deviceNo = `DEV-${Date.now()}`
   const deviceName = String(extractedData.instrumentName || '压力表').trim() || '压力表'
   const factoryNo = String(extractedData.factoryNo || '').trim()
@@ -581,31 +599,33 @@ async function handleSaveEnterpriseAiRecord(payload = {}) {
   const district = String(extractedData.district || equipment.district || enterprise.district || '').trim()
   const gaugeStatus = String(extractedData.gaugeStatus || '在用').trim() || '在用'
 
-  const deviceDoc = {
+  await insertRow('devices', {
+    id: deviceId,
     deviceNo,
     deviceName,
     deviceType: '压力表',
-    enterpriseId: enterprise.id || enterprise._id || companyName,
+    enterpriseId: enterprise.id || companyName,
     enterpriseName: companyName,
     district,
     factoryNo,
-    equipmentId: equipment._id,
+    certNo,
+    equipmentId: equipment.id,
     equipmentName: equipment.equipmentName || '',
     status: gaugeStatus,
     manufacturer,
     modelSpec,
     installLocation: equipment.location || '',
     recordCount: 1,
-    isDeleted: false,
+    isDeleted: 0,
     deletedAt: '',
     deletedBy: '',
     deletedById: '',
     createTime: now,
     updateTime: now
-  }
-  const deviceAddRes = await db.collection('devices').add({ data: deviceDoc })
+  })
 
-  const recordDoc = {
+  await insertRow('pressure_records', {
+    id: recordId,
     certNo,
     sendUnit,
     instrumentName: deviceName,
@@ -618,44 +638,41 @@ async function handleSaveEnterpriseAiRecord(payload = {}) {
     expiryDate: calculateExpiryDate(verificationDate),
     district,
     status: 'valid',
-    isDeleted: false,
+    isDeleted: 0,
     deletedAt: '',
     deletedBy: '',
     createTime: now,
     updateTime: now,
     ocrSource: 'web_ai_assistant_server',
-    hasImage: !!fileID,
-    hasInstallPhoto: false,
-    enterpriseId: enterprise.id || enterprise._id || companyName,
+    hasImage: toBool(fileID),
+    hasInstallPhoto: 0,
+    fileID,
+    enterpriseId: enterprise.id || companyName,
     enterpriseName: companyName,
     enterprisePhone: enterprise.phone || '',
     enterpriseLegalPerson: enterprise.legalPerson || '',
     createdBy: 'enterprise_web_server',
-    equipmentId: equipment._id,
+    equipmentId: equipment.id,
     equipmentName: equipment.equipmentName || '',
-    deviceId: deviceAddRes._id,
+    deviceId,
     deviceName,
     deviceNo,
     deviceStatus: gaugeStatus
-  }
-  if (fileID) recordDoc.fileID = fileID
-  const recordAddRes = await db.collection('pressure_records').add({ data: recordDoc })
+  })
 
-  const gaugeCountRes = await db.collection('devices').where({
-    equipmentId: equipment._id,
-    isDeleted: false
-  }).count()
-  await db.collection('equipments').doc(equipment._id).update({
-    data: {
-      gaugeCount: Number(gaugeCountRes.total || 0),
-      updateTime: now
-    }
+  const countRow = await one(
+    'SELECT COUNT(*) AS total FROM devices WHERE equipmentId = :equipmentId AND isDeleted = 0',
+    { equipmentId: equipment.id }
+  )
+  await updateById('equipments', equipment.id, {
+    gaugeCount: Number(countRow?.total || 0),
+    updateTime: now
   })
 
   return {
     success: true,
-    recordId: recordAddRes._id,
-    deviceId: deviceAddRes._id
+    recordId,
+    deviceId
   }
 }
 
