@@ -1,9 +1,26 @@
 import cloudbase from '@cloudbase/js-sdk'
+import axios from 'axios'
 import { cloudConfig, collections } from './config'
 
 let app
 let auth
 let authPromise
+
+function getServerToken() {
+  if (typeof localStorage === 'undefined') return ''
+  return localStorage.getItem('webToken') || localStorage.getItem('adminToken') || ''
+}
+
+async function postServer(path, data = {}) {
+  const baseUrl = String(cloudConfig.apiBaseUrl || '').replace(/\/$/, '')
+  const response = await axios.post(`${baseUrl}${path}`, data, {
+    timeout: 60000,
+    headers: getServerToken()
+      ? { Authorization: `Bearer ${getServerToken()}` }
+      : {}
+  })
+  return response.data || {}
+}
 
 function getCloudApp() {
   if (!app) {
@@ -46,6 +63,14 @@ export async function callCloudFunction(name, data = {}) {
 }
 
 export async function callAdminFunction(action, payload = {}) {
+  if (cloudConfig.apiBaseUrl) {
+    const result = await postServer('/api/admin/call', { action, payload })
+    if (!result.success) {
+      throw new Error(result.message || '网页接口调用失败')
+    }
+    return result.data
+  }
+
   const response = await callCloudFunction(cloudConfig.adminFunctionName, {
     action,
     payload
@@ -60,6 +85,14 @@ export async function callAdminFunction(action, payload = {}) {
 }
 
 export async function callAiFunction(payload = {}) {
+  if (cloudConfig.apiBaseUrl) {
+    const result = await postServer('/api/ai/call', payload)
+    if (result.success === false) {
+      throw new Error(result.error || result.message || 'AI 服务调用失败')
+    }
+    return result
+  }
+
   const response = await callCloudFunction(cloudConfig.aiFunctionName, payload)
   const result = response?.result || {}
   if (result.success === false) {
@@ -69,6 +102,14 @@ export async function callAiFunction(payload = {}) {
 }
 
 export async function callOcrFunction(payload = {}) {
+  if (cloudConfig.apiBaseUrl) {
+    const result = await postServer('/api/ocr/call', payload)
+    if (!result.success) {
+      throw new Error(result.error || result.message || 'OCR 服务调用失败')
+    }
+    return result
+  }
+
   const response = await callCloudFunction(cloudConfig.ocrFunctionName, payload)
   const result = response?.result || {}
   if (!result.success) {

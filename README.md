@@ -55,6 +55,26 @@ D:\wechatsoftware\pc-admin\dist
 
 修改这些云函数后，需要重新部署。
 
+## 独立后端迁移
+
+现在项目里新增了独立后端目录：
+
+```text
+D:\wechatsoftware\pc-admin\server
+```
+
+用途：
+
+- 把网页端原本依赖的 `webAdmin / aiAssistant / baiduOcr` 迁到你自己的云服务器
+- 前端通过 `VITE_API_BASE_URL` 切换到这个后端
+- 后端当前仍然直连原来的云开发数据库，所以网页端和小程序数据继续互通
+
+后端详细启动说明见：
+
+```text
+D:\wechatsoftware\pc-admin\server\README.md
+```
+
 ## webAdmin 当前需要支持的动作
 
 - `login`

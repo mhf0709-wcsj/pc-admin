@@ -1,4 +1,5 @@
 export const cloudConfig = {
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',
   envId: 'cloud1-3gxphq02b0e0bee4',
   region: 'ap-shanghai',
   adminFunctionName: 'webAdmin',
