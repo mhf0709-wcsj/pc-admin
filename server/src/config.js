@@ -9,6 +9,7 @@ function splitOrigins(value) {
 }
 
 module.exports = {
+  host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 3001),
   corsOrigins: splitOrigins(process.env.CORS_ORIGIN),
   mysql: {

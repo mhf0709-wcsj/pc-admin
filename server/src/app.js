@@ -94,6 +94,6 @@ app.use((error, req, res, next) => {
   res.status(statusCode).json(payload)
 })
 
-app.listen(config.port, () => {
-  console.log(`pc-admin server listening on :${config.port}`)
+app.listen(config.port, config.host, () => {
+  console.log(`pc-admin server listening on ${config.host}:${config.port}`)
 })
