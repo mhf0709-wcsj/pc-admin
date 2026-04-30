@@ -13,24 +13,44 @@ const pool = mysql.createPool({
   timezone: '+08:00'
 })
 
-async function query(sql, params = {}) {
-  const [rows] = await pool.execute(sql, params)
+function getExecutor(executor) {
+  return executor || pool
+}
+
+async function query(sql, params = {}, executor = null) {
+  const [rows] = await getExecutor(executor).execute(sql, params)
   return rows
 }
 
-async function one(sql, params = {}) {
-  const rows = await query(sql, params)
+async function one(sql, params = {}, executor = null) {
+  const rows = await query(sql, params, executor)
   return rows[0] || null
 }
 
-async function exec(sql, params = {}) {
-  const [result] = await pool.execute(sql, params)
+async function exec(sql, params = {}, executor = null) {
+  const [result] = await getExecutor(executor).execute(sql, params)
   return result
+}
+
+async function withTransaction(run) {
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const result = await run(connection)
+    await connection.commit()
+    return result
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 }
 
 module.exports = {
   pool,
   query,
   one,
-  exec
+  exec,
+  withTransaction
 }

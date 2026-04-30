@@ -1,40 +1,37 @@
 const KNOWLEDGE_BASE = `
-## 压力表检定专业知识库
+Pressure gauge inspection basics:
 
-### 一、检定周期
-1. 一般压力表的检定周期为6个月
-2. 新购置的压力表首次使用前必须进行检定
-3. 修理后的压力表必须重新检定
-4. 长期停用后重新使用前需要检定
-
-### 二、检定不合格标准
-1. 示值误差超过允许误差
-2. 回程误差超过允许误差
-3. 轻敲位移超过允许误差绝对值的1/2
-4. 指针不能回到零点或零点误差超标
-5. 外观有明显缺陷影响读数
-
-### 三、选型要求
-1. 压力表量程上限一般应为工作压力的1.5到3倍
-2. 一般工况下可优先选择工作压力2倍量程
+1. A common inspection cycle is 6 months for general pressure gauges.
+2. New gauges should be inspected before first use.
+3. Repaired gauges should be re-inspected before going back into service.
+4. Gauges used in safety critical scenarios should be tracked carefully for expiry.
+5. Typical failure reasons include excessive indication error, return error, poor zero reset, or visible damage.
 `
 
 function getKnowledgeBase() {
-  return KNOWLEDGE_BASE
+  return KNOWLEDGE_BASE.trim()
 }
 
 function getRelevantKnowledge(question) {
-  const text = String(question || '')
+  const text = String(question || '').toLowerCase()
   const parts = []
-  if (/周期|多久|频率|几个月/.test(text)) {
-    parts.push('检定周期：一般压力表检定周期为6个月。')
+
+  if (/cycle|多久|周期|frequency/.test(text)) {
+    parts.push('General pressure gauges are commonly inspected every 6 months.')
   }
-  if (/不合格|合格|标准/.test(text)) {
-    parts.push('不合格标准：示值误差、回程误差、轻敲位移、零点误差或外观缺陷超标时判定为不合格。')
+
+  if (/qualified|不合格|合格|pass|fail/.test(text)) {
+    parts.push('Typical failure reasons include excessive indication error, return error, poor zero reset, or visible damage.')
   }
-  if (/选型|量程|选择/.test(text)) {
-    parts.push('选型要求：量程上限一般应为工作压力的1.5到3倍。')
+
+  if (/selection|选型|range|量程/.test(text)) {
+    parts.push('Working pressure is usually expected to stay in the middle portion of the selected range, not at the upper limit.')
   }
+
+  if (/install|安装|location/.test(text)) {
+    parts.push('Install gauges in a readable and maintainable location, and avoid strong vibration, corrosion, or excessive heat when possible.')
+  }
+
   return parts.join('\n')
 }
 

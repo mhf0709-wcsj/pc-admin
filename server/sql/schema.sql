@@ -4,7 +4,7 @@ USE pressure_admin;
 CREATE TABLE IF NOT EXISTS admins (
   id VARCHAR(64) PRIMARY KEY,
   username VARCHAR(80) NOT NULL UNIQUE,
-  password VARCHAR(160) NOT NULL,
+  password VARCHAR(255) NOT NULL,
   role VARCHAR(32) NOT NULL DEFAULT 'admin',
   district VARCHAR(80) DEFAULT '',
   createTime VARCHAR(32) DEFAULT '',
@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS enterprises (
   updateTime VARCHAR(32) DEFAULT '',
   lastLoginTime VARCHAR(32) DEFAULT '',
   INDEX idx_enterprise_district (district),
-  INDEX idx_enterprise_phone (phone)
+  INDEX idx_enterprise_phone (phone),
+  INDEX idx_enterprise_credit (creditCode)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS equipments (
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS devices (
   id VARCHAR(64) PRIMARY KEY,
   deviceNo VARCHAR(100) DEFAULT '',
   deviceName VARCHAR(200) DEFAULT '',
-  deviceType VARCHAR(80) DEFAULT '压力表',
+  deviceType VARCHAR(80) DEFAULT 'pressure_gauge',
   enterpriseId VARCHAR(64) DEFAULT '',
   enterpriseName VARCHAR(200) NOT NULL,
   district VARCHAR(80) DEFAULT '',
@@ -57,7 +58,7 @@ CREATE TABLE IF NOT EXISTS devices (
   certNo VARCHAR(120) DEFAULT '',
   equipmentId VARCHAR(64) DEFAULT '',
   equipmentName VARCHAR(200) DEFAULT '',
-  status VARCHAR(40) DEFAULT '在用',
+  status VARCHAR(40) DEFAULT 'in_use',
   manufacturer VARCHAR(200) DEFAULT '',
   modelSpec VARCHAR(200) DEFAULT '',
   installLocation VARCHAR(240) DEFAULT '',
@@ -127,7 +128,3 @@ CREATE TABLE IF NOT EXISTS deletion_logs (
   snapshot JSON NULL,
   INDEX idx_delete_enterprise_time (enterpriseName, deleteTime)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-INSERT INTO admins (id, username, password, role, district, createTime, updateTime)
-VALUES ('admin-default', 'admin', 'admin123', 'admin', '', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))
-ON DUPLICATE KEY UPDATE username = username;

@@ -26,5 +26,15 @@ module.exports = {
   baidu: {
     apiKey: process.env.BAIDU_API_KEY || '',
     secretKey: process.env.BAIDU_SECRET_KEY || ''
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'replace-this-before-production',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+  },
+  seed: {
+    adminUsername: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
+    adminPassword: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123',
+    adminRole: process.env.DEFAULT_ADMIN_ROLE || 'admin',
+    adminDistrict: process.env.DEFAULT_ADMIN_DISTRICT || ''
   }
 }

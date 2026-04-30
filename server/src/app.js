@@ -1,9 +1,16 @@
 const express = require('express')
 const cors = require('cors')
 const config = require('./config')
+const { readSessionFromRequest } = require('./lib/auth')
 const { handleAdminAction } = require('./services/adminService')
 const { handleAiPayload } = require('./services/aiService')
 const { runOcr } = require('./services/ocrService')
+
+const OPEN_ADMIN_ACTIONS = new Set([
+  'login',
+  'enterpriseLogin',
+  'enterpriseRegister'
+])
 
 const app = express()
 
@@ -16,47 +23,75 @@ app.use(cors({
     callback(new Error(`Origin not allowed: ${origin}`))
   }
 }))
+
 app.use(express.json({ limit: '20mb' }))
 app.use(express.urlencoded({ extended: true, limit: '20mb' }))
 
+function requireSession(req) {
+  const session = readSessionFromRequest(req)
+  if (!session) {
+    const error = new Error('Unauthorized')
+    error.statusCode = 401
+    throw error
+  }
+  return session
+}
+
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'pc-admin server ok' })
+  res.json({
+    success: true,
+    message: 'pc-admin server ok'
+  })
 })
 
-app.post('/api/admin/call', async (req, res) => {
+app.post('/api/admin/call', async (req, res, next) => {
   try {
-    const action = req.body?.action
+    const action = String(req.body?.action || '').trim()
     const payload = req.body?.payload || {}
-    const data = await handleAdminAction(action, payload)
+    const session = OPEN_ADMIN_ACTIONS.has(action) ? null : requireSession(req)
+    const data = await handleAdminAction(action, payload, session)
     res.json({ success: true, data })
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message || 'Admin API failed' })
+    next(error)
   }
 })
 
-app.post('/api/ai/call', async (req, res) => {
+app.post('/api/ai/call', async (req, res, next) => {
   try {
-    const result = await handleAiPayload(req.body || {})
+    const session = requireSession(req)
+    const result = await handleAiPayload(req.body || {}, session)
     res.json(result)
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message || 'AI API failed' })
+    next(error)
   }
 })
 
-app.post('/api/ocr/call', async (req, res) => {
+app.post('/api/ocr/call', async (req, res, next) => {
   try {
+    requireSession(req)
     const result = await runOcr(req.body || {})
     res.json(result)
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message || 'OCR API failed' })
+    next(error)
   }
 })
 
 app.use((error, req, res, next) => {
-  res.status(500).json({
+  const statusCode = Number(error.statusCode || 400)
+  const payload = {
     success: false,
     message: error.message || 'Server error'
-  })
+  }
+
+  if (req.path.includes('/api/ai/') || req.path.endsWith('/api/ai/call')) {
+    payload.error = payload.message
+  }
+
+  if (req.path.includes('/api/ocr/') || req.path.endsWith('/api/ocr/call')) {
+    payload.error = payload.message
+  }
+
+  res.status(statusCode).json(payload)
 })
 
 app.listen(config.port, () => {

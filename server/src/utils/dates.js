@@ -43,12 +43,15 @@ function isExpiringDate(value, days = 30) {
 function parseDateInput(value) {
   const text = String(value || '').trim()
   if (!text) return null
+
   const normalized = text
     .replace(/年/g, '-')
     .replace(/月/g, '-')
     .replace(/日/g, '')
     .replace(/\./g, '-')
     .replace(/\//g, '-')
+    .replace(/\s+/g, '')
+
   const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return null
   return date

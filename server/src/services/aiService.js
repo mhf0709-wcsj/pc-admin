@@ -2,79 +2,122 @@ const axios = require('axios')
 const config = require('../config')
 const { getKnowledgeBase, getRelevantKnowledge } = require('./knowledge')
 
-function normalizeExtractText(text) {
-  let next = String(text || '').replace(/\r/g, '')
-  for (let i = 0; i < 4; i += 1) {
-    next = next.replace(/([\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/g, '$1')
-  }
-  return next
+function normalizeText(text) {
+  return String(text || '')
+    .replace(/\r/g, '\n')
+    .replace(/：/g, ':')
+    .replace(/（/g, '(')
+    .replace(/）/g, ')')
+    .replace(/[ \t]+/g, ' ')
 }
 
-function cleanupLineValue(value) {
-  return String(value || '')
-    .replace(/^[：:.\-\s]+/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function extractLineValue(text, labels) {
-  const lines = normalizeExtractText(text).split('\n').map((line) => line.trim()).filter(Boolean)
-  for (const label of labels) {
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i]
-      const idx = line.indexOf(label)
-      if (idx >= 0) {
-        const value = cleanupLineValue(line.slice(idx + label.length))
-        if (value) return value
-        if (lines[i + 1]) return cleanupLineValue(lines[i + 1])
-      }
-    }
+function firstMatch(text, patterns) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match && match[1]) return match[1].trim()
   }
   return ''
 }
 
-function extractDate(text, labels) {
-  const raw = extractLineValue(text, labels)
-  if (!raw) return ''
-  const match = raw.match(/(20\d{2})[-./年](\d{1,2})[-./月](\d{1,2})/)
-  if (!match) return ''
-  return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`
+function cleanupLineValue(value) {
+  if (!value) return ''
+  return String(value)
+    .split('\n')[0]
+    .trim()
 }
 
-function heuristicExtract(text) {
-  const normalized = normalizeExtractText(text)
-  return {
-    certNo: extractLineValue(normalized, ['证书编号', '证书号']),
-    factoryNo: extractLineValue(normalized, ['出厂编号', '出厂号']),
-    sendUnit: extractLineValue(normalized, ['送检单位']),
-    instrumentName: extractLineValue(normalized, ['计量器具名称', '仪表名称']),
-    modelSpec: extractLineValue(normalized, ['型号/规格', '型号规格', '规格型号']),
-    manufacturer: extractLineValue(normalized, ['制造单位', '生产单位']),
-    verificationStd: extractLineValue(normalized, ['检定依据']),
-    conclusion: extractLineValue(normalized, ['检定结论']) || (normalized.includes('该压力表合格') || normalized.includes('合格') ? '合格' : ''),
-    verificationDate: extractDate(normalized, ['检定日期']),
+function extractPressureRange(text) {
+  const value = firstMatch(text, [
+    /([\(（]?\s*\d+(?:\.\d+)?\s*(?:-|~|－|—|–|一|至|到)\s*\d+(?:\.\d+)?\s*[\)）]?\s*(?:k|K|m|M|g|G)?\s*P\s*a)/i
+  ])
+
+  if (!value) return ''
+  return value
+    .replace(/（/g, '(')
+    .replace(/）/g, ')')
+    .replace(/[－—–一到至~]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/([kmg])\s*pa/i, (_, prefix) => `${prefix.toUpperCase()}Pa`)
+    .replace(/pa/i, 'Pa')
+    .trim()
+}
+
+function extractDate(text) {
+  const match = text.match(/(20\d{2})\s*(?:年|[.\-/])\s*(\d{1,2})\s*(?:月|[.\-/])\s*(\d{1,2})\s*(?:日)?/)
+  if (!match) return ''
+  const month = String(Number(match[2])).padStart(2, '0')
+  const day = String(Number(match[3])).padStart(2, '0')
+  return `${match[1]}-${month}-${day}`
+}
+
+function heuristicExtractRecord(text) {
+  const normalized = normalizeText(text)
+  const compact = normalized.replace(/\s+/g, '')
+
+  const result = {
+    certNo: firstMatch(normalized, [
+      /(?:证书编号|证书号|NO|No)[:\s]*([A-Za-z0-9\-]{5,})/i
+    ]),
+    factoryNo: firstMatch(normalized, [
+      /(?:出厂编号|出厂号|器号|表号)[:\s]*([A-Za-z0-9\-\/]{3,})/i
+    ]),
+    sendUnit: cleanupLineValue(firstMatch(normalized, [
+      /(?:送检单位|委托单位|使用单位)[:\s]*([^\n]+)/i
+    ])),
+    instrumentName: cleanupLineValue(firstMatch(normalized, [
+      /(?:器具名称|仪表名称|名称)[:\s]*([^\n]+)/i
+    ])),
+    modelSpec: cleanupLineValue(firstMatch(normalized, [
+      /(?:型号规格|规格型号|型号|规格)[:\s]*([^\n]+)/i
+    ])),
+    manufacturer: cleanupLineValue(firstMatch(normalized, [
+      /(?:制造单位|生产厂家|制造厂|厂家)[:\s]*([^\n]+)/i
+    ])),
+    verificationStd: firstMatch(normalized, [/(JJG\s*[\d\-]+)/i]).replace(/\s+/g, ''),
+    conclusion: '',
+    verificationDate: '',
     gaugeStatus: '在用'
   }
+
+  if (!result.instrumentName && compact.includes('压力表')) {
+    result.instrumentName = '压力表'
+  }
+
+  if (!result.modelSpec) {
+    result.modelSpec = extractPressureRange(normalized)
+  }
+
+  if (compact.includes('不合格')) {
+    result.conclusion = '不合格'
+  } else if (compact.includes('该压力表合格') || compact.includes('合格')) {
+    result.conclusion = '合格'
+  }
+
+  result.verificationDate = extractDate(normalized)
+  return result
 }
 
-async function callDashScope(messages) {
+async function callDashScope(messages, responseFormat = null) {
   if (!config.dashscope.apiKey) return ''
-  const response = await axios.post(
-    config.dashscope.endpoint,
-    {
-      model: config.dashscope.model,
-      messages,
-      temperature: 0.2,
-      response_format: { type: 'json_object' }
-    },
-    {
-      timeout: 60000,
-      headers: {
-        Authorization: `Bearer ${config.dashscope.apiKey}`,
-        'Content-Type': 'application/json'
-      }
+
+  const body = {
+    model: config.dashscope.model,
+    messages,
+    temperature: 0.2
+  }
+
+  if (responseFormat) {
+    body.response_format = responseFormat
+  }
+
+  const response = await axios.post(config.dashscope.endpoint, body, {
+    timeout: 60000,
+    headers: {
+      Authorization: `Bearer ${config.dashscope.apiKey}`,
+      'Content-Type': 'application/json'
     }
-  )
+  })
 
   return response?.data?.choices?.[0]?.message?.content || ''
 }
@@ -95,7 +138,7 @@ function parseJsonSafely(content) {
 }
 
 async function extractRecordFromText(ocrText) {
-  const fallback = heuristicExtract(ocrText)
+  const fallback = heuristicExtractRecord(ocrText)
   if (!config.dashscope.apiKey) {
     return fallback
   }
@@ -105,18 +148,19 @@ async function extractRecordFromText(ocrText) {
       {
         role: 'system',
         content: [
-          '你是压力表检定证书字段提取器。',
-          '只返回 JSON。',
-          '字段只允许：certNo,factoryNo,sendUnit,instrumentName,modelSpec,manufacturer,verificationStd,conclusion,verificationDate,gaugeStatus。',
-          'verificationDate 输出格式必须为 YYYY-MM-DD。',
-          '识别不到时返回空字符串。'
+          'You extract structured fields from pressure gauge inspection text.',
+          'Return JSON only.',
+          'Allowed keys: certNo,factoryNo,sendUnit,instrumentName,modelSpec,manufacturer,verificationStd,conclusion,verificationDate,gaugeStatus.',
+          'verificationDate must use YYYY-MM-DD.',
+          'Use an empty string when a field is missing.'
         ].join('\n')
       },
       {
         role: 'user',
-        content: `请从下面文本中提取字段：\n${normalizeExtractText(ocrText)}`
+        content: `Extract fields from the following OCR text:\n${normalizeText(ocrText)}`
       }
-    ])
+    ], { type: 'json_object' })
+
     const parsed = parseJsonSafely(content) || {}
     return {
       ...fallback,
@@ -136,69 +180,66 @@ async function extractRecordFromText(ocrText) {
   }
 }
 
-async function answerQuestion(payload = {}) {
+function buildScopeLabel(session) {
+  if (!session) return 'guest'
+  if (session.userType === 'enterprise') return `enterprise:${session.companyName || session.sub || ''}`
+  if (session.userType === 'admin') return `admin:${session.role || 'admin'}:${session.district || 'all'}`
+  return String(session.userType || 'guest')
+}
+
+async function answerQuestion(payload = {}, session) {
   const question = String(payload.question || '').trim()
   if (!question) {
-    return { success: true, answer: '请输入问题。' }
+    return { success: true, answer: 'Please enter a question.' }
   }
 
   const contextText = (payload.conversationContext?.recentMessages || [])
-    .map((item) => `${item.role === 'assistant' ? 'AI' : '用户'}：${item.content}`)
+    .map((item) => `${item.role === 'assistant' ? 'AI' : 'User'}: ${item.content}`)
     .join('\n')
-  const knowledge = getRelevantKnowledge(question) || getKnowledgeBase()
 
+  const knowledge = getRelevantKnowledge(question) || getKnowledgeBase()
   if (!config.dashscope.apiKey) {
     return {
       success: true,
-      answer: knowledge ? `参考资料：\n${knowledge}` : '当前未配置大模型，且没有命中本地知识库。'
+      answer: knowledge
+        ? `Reference:\n${knowledge}`
+        : 'No AI provider is configured, and no local knowledge matched the question.'
     }
   }
 
-  const answer = await axios.post(
-    config.dashscope.endpoint,
+  const answer = await callDashScope([
     {
-      model: config.dashscope.model,
-      messages: [
-        {
-          role: 'system',
-          content: [
-            '你是压力表智能管家。',
-            '优先根据给定资料回答，不要编造法规、标准或业务数据。',
-            '回答使用简体中文，专业直接。'
-          ].join('\n')
-        },
-        {
-          role: 'user',
-          content: [
-            `用户问题：${question}`,
-            contextText ? `最近上下文：\n${contextText}` : '',
-            `可用资料：\n${knowledge}`
-          ].filter(Boolean).join('\n\n')
-        }
-      ],
-      temperature: 0.4
+      role: 'system',
+      content: [
+        'You are an assistant for pressure gauge records and inspection operations.',
+        'Answer in Simplified Chinese unless the user clearly uses another language.',
+        'Do not invent regulations or business facts that are not present in the provided material.',
+        `Current scope: ${buildScopeLabel(session)}.`
+      ].join('\n')
     },
     {
-      timeout: 60000,
-      headers: {
-        Authorization: `Bearer ${config.dashscope.apiKey}`,
-        'Content-Type': 'application/json'
-      }
+      role: 'user',
+      content: [
+        `Question:\n${question}`,
+        contextText ? `Conversation context:\n${contextText}` : '',
+        `Reference material:\n${knowledge}`
+      ].filter(Boolean).join('\n\n')
     }
-  )
+  ])
 
   return {
     success: true,
-    answer: answer?.data?.choices?.[0]?.message?.content || '未获取到有效回复。'
+    answer: answer || 'No answer was produced.'
   }
 }
 
-async function handleAiPayload(payload = {}) {
+async function handleAiPayload(payload = {}, session) {
   if (payload.action === 'extractRecordFromImage') {
-    const data = await extractRecordFromText(payload.ocrText || '')
+    const data = await extractRecordFromText(String(payload.ocrText || '').trim())
     return { success: true, data }
   }
-  return answerQuestion(payload)
+
+  return answerQuestion(payload, session)
 }
 
 module.exports = {

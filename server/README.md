@@ -1,106 +1,157 @@
 # pc-admin server
 
-这个目录是网页端对应的独立后端，目标是把原来依赖微信云函数和云开发数据库的能力迁到你自己的云服务器上。
+This directory contains the standalone backend for the current web admin product.
+It keeps the frontend contract stable while moving the old cloud-function logic onto your own server.
 
-当前已迁出的主链路：
+## What it exposes
 
-- `webAdmin`：监管端和企业端台账读写，使用自建 MySQL
-- `aiAssistant`：网页端 AI 问答、证书文本提取
-- `baiduOcr`：图片 OCR
+- `POST /api/admin/call`
+- `POST /api/ai/call`
+- `POST /api/ocr/call`
+- `GET /api/health`
 
-## 1. 安装
+The frontend already knows how to call these routes when `VITE_API_BASE_URL` is configured.
+
+## Stack
+
+- Node.js + Express
+- MySQL 8
+- JWT session tokens
+- Baidu OCR
+- DashScope for AI Q&A / field extraction
+
+## 1. Install
 
 ```bash
 cd /home/ubuntu/apps/pc-admin/server
 npm install
-```
-
-## 2. 配置环境变量
-
-复制模板：
-
-```bash
 cp .env.example .env
 ```
 
-至少需要填写：
+## 2. Configure `.env`
 
-- `PORT`
-- `CORS_ORIGIN`
+At minimum, fill in:
+
 - `MYSQL_HOST`
 - `MYSQL_PORT`
 - `MYSQL_USER`
 - `MYSQL_PASSWORD`
 - `MYSQL_DATABASE`
-- `DASHSCOPE_API_KEY`
+- `JWT_SECRET`
 - `BAIDU_API_KEY`
 - `BAIDU_SECRET_KEY`
 
-## 3. 初始化数据库
+Optional but recommended:
 
-服务器上需要先准备 MySQL 8。最简单的 Docker 方式：
+- `DEFAULT_ADMIN_USERNAME`
+- `DEFAULT_ADMIN_PASSWORD`
+- `DASHSCOPE_API_KEY`
+
+## 3. Create the database on the cloud server
+
+If you want the fastest path on Ubuntu with Docker:
 
 ```bash
-docker run -d --name pressure-mysql \
-  -e MYSQL_ROOT_PASSWORD=请改成强密码 \
+docker run -d \
+  --name pressure-mysql \
+  --restart always \
+  -e MYSQL_ROOT_PASSWORD=replace-root-password \
   -e MYSQL_DATABASE=pressure_admin \
   -e MYSQL_USER=pc_admin \
-  -e MYSQL_PASSWORD=请改成强密码 \
+  -e MYSQL_PASSWORD=replace-app-password \
   -p 3306:3306 \
   mysql:8.0
 ```
 
-然后执行建表脚本：
+If you prefer a package install:
+
+```bash
+sudo apt update
+sudo apt install -y mysql-server
+sudo systemctl enable --now mysql
+```
+
+Then create the app database and user:
+
+```sql
+CREATE DATABASE pressure_admin DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'pc_admin'@'%' IDENTIFIED BY 'replace-app-password';
+GRANT ALL PRIVILEGES ON pressure_admin.* TO 'pc_admin'@'%';
+FLUSH PRIVILEGES;
+```
+
+## 4. Initialize tables and default admin
 
 ```bash
 npm run init-db
 ```
 
-默认会创建 `admin / admin123` 管理员账号，上线前请尽快修改密码。
+That script:
 
-## 4. 启动
+- creates all tables from `sql/schema.sql`
+- creates the default admin if it does not exist
+- stores the admin password as a bcrypt hash
+
+## 5. Start the server
 
 ```bash
 npm run start
 ```
 
-默认健康检查：
-
-```text
-http://127.0.0.1:3001/api/health
-```
-
-## 5. 前端切换到新后端
-
-网页前端增加环境变量：
+Health check:
 
 ```bash
-VITE_API_BASE_URL=http://124.222.123.200:3001
+curl http://127.0.0.1:3001/api/health
 ```
 
-然后重新构建前端：
+Expected response:
+
+```json
+{"success":true,"message":"pc-admin server ok"}
+```
+
+## 6. Point the frontend to this server
+
+Create a frontend `.env` or deployment variable:
+
+```bash
+VITE_API_BASE_URL=http://your-server-ip:3001
+```
+
+Then rebuild the frontend:
 
 ```bash
 npm run build
 ```
 
-当前前端逻辑：
+## 7. Recommended production setup
 
-- 配了 `VITE_API_BASE_URL`：优先请求你自己的服务器
-- 没配：继续回退到云函数
+Use Nginx as a reverse proxy and expose only ports `80/443`.
+Run the Node service behind PM2 or systemd.
 
-## 6. 当前范围
+Example PM2 flow:
 
-这版优先保障网页端主链路。
+```bash
+npm install -g pm2
+pm2 start src/app.js --name pc-admin-server
+pm2 save
+pm2 startup
+```
 
-已覆盖：
+## Current scope
 
-- 管理员登录、改密、监管概览、台账中心、企业管理
-- 企业登录、注册、设备台账、压力表台账、AI 识别存档
-- PDF 首页面文本提取后的 AI 结构化识别
+This backend already covers the current web product flow:
 
-暂未纳入自建后端的微信专属能力：
+- admin login
+- admin dashboard / records / enterprises
+- enterprise login / register
+- enterprise equipment list
+- enterprise gauge list
+- AI-assisted record save
+- OCR relay
 
-- 小程序 `enterpriseAuth` 的 openid 绑定链路
-- `expiryReminder` 订阅消息和微信模板消息链路
-- 只在小程序里使用的云调用上下文能力
+It does not yet recreate WeChat-only capabilities such as:
+
+- openid binding
+- WeChat subscription messages
+- mini-program-specific runtime context
