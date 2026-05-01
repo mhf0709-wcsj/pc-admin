@@ -71,24 +71,24 @@ const rules = {
   equipmentName: [{ required: true, message: '请输入设备名称', trigger: 'blur' }]
 }
 
-const resetForm = () => {
+function resetForm() {
   form._id = ''
   form.equipmentName = ''
   form.equipmentNo = ''
   form.location = ''
 }
 
-const loadData = async () => {
+async function loadData() {
   const result = await getEnterpriseEquipments(userStore.user, { keyword: keyword.value })
   list.value = result.list || []
 }
 
-const openCreate = () => {
+function openCreate() {
   resetForm()
   dialogVisible.value = true
 }
 
-const openEdit = (row) => {
+function openEdit(row) {
   form._id = row._id
   form.equipmentName = row.equipmentName
   form.equipmentNo = row.equipmentNo
@@ -96,7 +96,7 @@ const openEdit = (row) => {
   dialogVisible.value = true
 }
 
-const save = async () => {
+async function save() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
   loading.value = true
@@ -110,7 +110,7 @@ const save = async () => {
   }
 }
 
-const remove = async (row) => {
+async function remove(row) {
   await ElMessageBox.confirm(`确定删除设备“${row.equipmentName}”吗？删除后管理端会看到数据变化。`, '确认删除', {
     type: 'warning',
     confirmButtonText: '删除',
@@ -143,6 +143,14 @@ onMounted(loadData)
 
   .el-input {
     max-width: 360px;
+  }
+}
+
+@media (max-width: 768px) {
+  .action-header,
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

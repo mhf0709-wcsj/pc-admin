@@ -20,6 +20,19 @@ The frontend already knows how to call these routes when `VITE_API_BASE_URL` is 
 - Baidu OCR
 - DashScope for AI Q&A / field extraction
 
+## Local development shortcut
+
+If you only want to iterate on the web product locally and do not want to install MySQL first:
+
+```bash
+cd D:\wechatsoftware\pc-admin\server
+copy .env.local.example .env.local
+npm run init-db
+npm run start
+```
+
+That starts the backend against a local SQLite file at `server/data/pc-admin.local.sqlite`.
+
 ## 1. Install
 
 ```bash
@@ -88,7 +101,8 @@ npm run init-db
 
 That script:
 
-- creates all tables from `sql/schema.sql`
+- creates all tables from `sql/schema.sql` when `DB_CLIENT=mysql`
+- creates all tables from `sql/schema.sqlite.sql` when `DB_CLIENT=sqlite`
 - creates the default admin if it does not exist
 - stores the admin password as a bcrypt hash
 

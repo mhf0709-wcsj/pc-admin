@@ -14,6 +14,10 @@ const OPEN_ADMIN_ACTIONS = new Set([
 
 const app = express()
 
+function createRequestId(prefix = 'req') {
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+}
+
 app.use(cors({
   origin(origin, callback) {
     if (!origin || !config.corsOrigins.length || config.corsOrigins.includes(origin)) {
@@ -57,11 +61,40 @@ app.post('/api/admin/call', async (req, res, next) => {
 })
 
 app.post('/api/ai/call', async (req, res, next) => {
+  const requestId = createRequestId('ai')
+  const startedAt = Date.now()
   try {
     const session = requireSession(req)
-    const result = await handleAiPayload(req.body || {}, session)
+    const payload = req.body || {}
+    const action = String(payload.action || 'question')
+    const ocrTextLength = String(payload.ocrText || '').length
+    const questionLength = String(payload.question || '').length
+
+    console.log('[ai.call] start', {
+      requestId,
+      action,
+      userType: session?.userType || 'guest',
+      scope: session?.companyName || session?.username || session?.sub || '',
+      ocrTextLength,
+      questionLength
+    })
+
+    const result = await handleAiPayload(payload, session, { requestId })
+
+    console.log('[ai.call] success', {
+      requestId,
+      action,
+      durationMs: Date.now() - startedAt
+    })
     res.json(result)
   } catch (error) {
+    console.error('[ai.call] error', {
+      requestId,
+      durationMs: Date.now() - startedAt,
+      message: error?.message || 'Unknown error',
+      code: error?.code || '',
+      stack: error?.stack || ''
+    })
     next(error)
   }
 })

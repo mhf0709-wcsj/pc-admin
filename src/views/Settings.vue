@@ -2,14 +2,18 @@
   <div class="settings-page">
     <div class="page-header">
       <h1 class="page-title">账号设置</h1>
-      <p class="page-subtitle">网页端当前使用和小程序管理端同一套账号集合。这里先保留最常用的账号信息和修改密码能力。</p>
+      <p class="page-subtitle">
+        当前网页端与小程序管理端共用同一套账号体系，这里保留最常用的账号信息和密码修改能力。
+      </p>
     </div>
 
     <div class="settings-grid">
       <section class="setting-card card-shell">
         <h3>当前账号</h3>
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="用户名">{{ userStore.user?.username || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="用户名">
+            {{ userStore.user?.username || '-' }}
+          </el-descriptions-item>
           <el-descriptions-item label="角色">
             <el-tag :type="userStore.isAdmin ? 'danger' : 'primary'">
               {{ userStore.isAdmin ? '总管理员' : '辖区管理员' }}
@@ -25,13 +29,28 @@
         <h3>修改密码</h3>
         <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="96px">
           <el-form-item label="原密码" prop="oldPassword">
-            <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入原密码" />
+            <el-input
+              v-model="passwordForm.oldPassword"
+              type="password"
+              show-password
+              placeholder="请输入原密码"
+            />
           </el-form-item>
           <el-form-item label="新密码" prop="newPassword">
-            <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="请输入新密码" />
+            <el-input
+              v-model="passwordForm.newPassword"
+              type="password"
+              show-password
+              placeholder="请输入新密码"
+            />
           </el-form-item>
           <el-form-item label="确认密码" prop="confirmPassword">
-            <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+            <el-input
+              v-model="passwordForm.confirmPassword"
+              type="password"
+              show-password
+              placeholder="请再次输入新密码"
+            />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleChangePassword">提交修改</el-button>

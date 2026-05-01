@@ -11,15 +11,38 @@ function getServerToken() {
   return localStorage.getItem('webToken') || localStorage.getItem('adminToken') || ''
 }
 
-async function postServer(path, data = {}) {
+function normalizeHttpError(error, fallbackMessage) {
+  if (axios.isCancel?.(error) || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+    return new Error('请求已取消，请重试')
+  }
+
+  if (error?.code === 'ECONNABORTED') {
+    return new Error('请求超时，请稍后重试')
+  }
+
+  const message =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    fallbackMessage
+
+  return new Error(message)
+}
+
+async function postServer(path, data = {}, requestOptions = {}) {
   const baseUrl = String(cloudConfig.apiBaseUrl || '').replace(/\/$/, '')
-  const response = await axios.post(`${baseUrl}${path}`, data, {
-    timeout: 60000,
-    headers: getServerToken()
-      ? { Authorization: `Bearer ${getServerToken()}` }
-      : {}
-  })
-  return response.data || {}
+  try {
+    const response = await axios.post(`${baseUrl}${path}`, data, {
+      timeout: requestOptions.timeout ?? 60000,
+      signal: requestOptions.signal,
+      headers: getServerToken()
+        ? { Authorization: `Bearer ${getServerToken()}` }
+        : {}
+    })
+    return response.data || {}
+  } catch (error) {
+    throw normalizeHttpError(error, '网络请求失败，请稍后重试')
+  }
 }
 
 function getCloudApp() {
@@ -84,9 +107,9 @@ export async function callAdminFunction(action, payload = {}) {
   return result.data
 }
 
-export async function callAiFunction(payload = {}) {
+export async function callAiFunction(payload = {}, requestOptions = {}) {
   if (cloudConfig.apiBaseUrl) {
-    const result = await postServer('/api/ai/call', payload)
+    const result = await postServer('/api/ai/call', payload, requestOptions)
     if (result.success === false) {
       throw new Error(result.error || result.message || 'AI 服务调用失败')
     }
@@ -101,9 +124,9 @@ export async function callAiFunction(payload = {}) {
   return result
 }
 
-export async function callOcrFunction(payload = {}) {
+export async function callOcrFunction(payload = {}, requestOptions = {}) {
   if (cloudConfig.apiBaseUrl) {
-    const result = await postServer('/api/ocr/call', payload)
+    const result = await postServer('/api/ocr/call', payload, requestOptions)
     if (!result.success) {
       throw new Error(result.error || result.message || 'OCR 服务调用失败')
     }

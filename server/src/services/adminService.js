@@ -1,6 +1,9 @@
 const crypto = require('crypto')
+const config = require('../config')
 const { one, query, exec, withTransaction } = require('../lib/db')
 const { comparePassword, hashPassword, signSessionToken } = require('../lib/auth')
+const { parseEnterpriseExcel } = require('./excelService')
+const { buildReminders, createSmsPlaceholder } = require('./reminderService')
 const {
   formatDate,
   formatDateTime,
@@ -62,7 +65,7 @@ function buildEnterpriseToken(enterprise) {
 
 function assertAdminSession(session) {
   if (!session || session.userType !== 'admin') {
-    const error = new Error('Admin session required')
+    const error = new Error('需要监管端登录状态')
     error.statusCode = 401
     throw error
   }
@@ -77,7 +80,7 @@ function assertAdminSession(session) {
 
 function assertEnterpriseSession(session) {
   if (!session || session.userType !== 'enterprise') {
-    const error = new Error('Enterprise session required')
+    const error = new Error('需要企业端登录状态')
     error.statusCode = 401
     throw error
   }
@@ -111,7 +114,7 @@ function buildAdminScope(admin) {
 
 function buildEnterpriseScope(enterprise) {
   if (!enterprise.companyName) {
-    throw new Error('Enterprise identity is missing')
+    throw new Error('企业身份信息缺失')
   }
   return enterprise.companyName
 }
@@ -144,16 +147,31 @@ async function getAdminByUsername(username, executor = null) {
   return one('SELECT * FROM admins WHERE username = :username LIMIT 1', { username }, executor)
 }
 
+function normalizeEnterpriseName(item = {}) {
+  return item.companyName || item.enterpriseName || ''
+}
+
+function normalizeReminderRecords(records = [], enterprises = []) {
+  const phoneMap = new Map()
+  enterprises.forEach((item) => {
+    const companyName = normalizeEnterpriseName(item)
+    if (companyName) {
+      phoneMap.set(companyName, item.phone || '')
+    }
+  })
+  return phoneMap
+}
+
 async function handleLogin(payload = {}) {
   const username = String(payload.username || '').trim()
   const password = String(payload.password || '').trim()
   if (!username || !password) {
-    throw new Error('Username and password are required')
+    throw new Error('请输入用户名和密码')
   }
 
   const admin = await getAdminByUsername(username)
   if (!admin || !(await comparePassword(password, admin.password))) {
-    throw new Error('Invalid username or password')
+    throw new Error('用户名或密码错误')
   }
 
   return {
@@ -168,12 +186,12 @@ async function handleChangePassword(payload = {}, session) {
   const newPassword = String(payload.newPassword || '').trim()
 
   if (!oldPassword || !newPassword) {
-    throw new Error('Old password and new password are required')
+    throw new Error('请输入旧密码和新密码')
   }
 
   const admin = await getAdminByUsername(adminSession.username)
   if (!admin || !(await comparePassword(oldPassword, admin.password))) {
-    throw new Error('Old password is incorrect')
+    throw new Error('旧密码不正确')
   }
 
   await updateById('admins', admin.id, {
@@ -202,10 +220,10 @@ async function handleGetDashboard(payload = {}, session) {
   const riskMap = new Map()
 
   records.forEach((record) => {
-    const district = record.district || 'Unassigned'
+    const district = record.district || '未分配'
     districtMap.set(district, (districtMap.get(district) || 0) + 1)
 
-    const conclusion = record.conclusion || 'Unknown'
+    const conclusion = record.conclusion || '未知'
     conclusionMap.set(conclusion, (conclusionMap.get(conclusion) || 0) + 1)
 
     const expired = isExpiredDate(record.expiryDate)
@@ -214,7 +232,7 @@ async function handleGetDashboard(payload = {}, session) {
     if (expiring) expiringCount += 1
 
     if (expired || expiring) {
-      const enterpriseName = record.enterpriseName || 'Unnamed enterprise'
+      const enterpriseName = record.enterpriseName || '未命名企业'
       if (!riskMap.has(enterpriseName)) {
         riskMap.set(enterpriseName, {
           enterpriseName,
@@ -237,17 +255,17 @@ async function handleGetDashboard(payload = {}, session) {
     }
   })
 
-  const enterprisePhoneMap = new Map()
-  enterprises.forEach((item) => {
-    if (item.companyName) {
-      enterprisePhoneMap.set(item.companyName, item.phone || '')
-    }
+  const phoneMap = normalizeReminderRecords(records, enterprises)
+  const reminders = buildReminders(records, {
+    days: 30,
+    limit: 8,
+    phoneMap
   })
 
   const focusEnterprises = Array.from(riskMap.values())
     .map((item) => ({
       ...item,
-      phone: enterprisePhoneMap.get(item.enterpriseName) || item.phone
+      phone: phoneMap.get(item.enterpriseName) || item.phone
     }))
     .sort((a, b) => {
       if (b.expiredCount !== a.expiredCount) return b.expiredCount - a.expiredCount
@@ -261,7 +279,7 @@ async function handleGetDashboard(payload = {}, session) {
       totalRecords: records.length,
       expiredCount,
       expiringCount,
-      enterpriseCount: focusEnterprises.length
+      enterpriseCount: enterprises.length
     },
     recentRecords: records.slice(0, 8).map((item) => ({
       _id: item.id,
@@ -275,7 +293,8 @@ async function handleGetDashboard(payload = {}, session) {
     })),
     districtStats: Array.from(districtMap.entries()).map(([name, value]) => ({ name, value })),
     conclusionStats: Array.from(conclusionMap.entries()).map(([name, value]) => ({ name, value })),
-    focusEnterprises
+    focusEnterprises,
+    reminders
   }
 }
 
@@ -289,9 +308,9 @@ async function handleGetRecords(payload = {}, session) {
 
   const keyword = String(payload.keyword || '').trim()
   const district = String(payload.district || '').trim()
-  const enterpriseName = String(payload.enterpriseName || '').trim()
+  const enterpriseName = String(payload.enterpriseName || payload.enterprise || '').trim()
   const conclusion = String(payload.conclusion || '').trim()
-  const filterType = String(payload.filterType || '').trim()
+  const filterType = String(payload.filterType || payload.filter || '').trim()
   const page = Number(payload.page || 1)
   const pageSize = Number(payload.pageSize || 20)
 
@@ -313,7 +332,8 @@ async function handleGetRecords(payload = {}, session) {
       item.enterpriseName,
       item.instrumentName,
       item.deviceName,
-      item.equipmentName
+      item.equipmentName,
+      item.installLocation
     ], keyword)
   })
 
@@ -329,7 +349,8 @@ async function handleGetRecords(payload = {}, session) {
       verificationDate: formatDate(item.verificationDate),
       expiryDate: formatDate(item.expiryDate),
       sendUnit: item.sendUnit || '',
-      equipmentName: item.equipmentName || item.deviceName || ''
+      equipmentName: item.equipmentName || item.deviceName || '',
+      installLocation: item.installLocation || ''
     })),
     total: filtered.length,
     page,
@@ -353,7 +374,7 @@ async function handleGetEnterprises(payload = {}, session) {
   const statsMap = new Map()
 
   records.forEach((record) => {
-    const enterpriseName = record.enterpriseName || 'Unnamed enterprise'
+    const enterpriseName = record.enterpriseName || '未命名企业'
     if (!statsMap.has(enterpriseName)) {
       statsMap.set(enterpriseName, {
         totalRecords: 0,
@@ -410,7 +431,7 @@ async function handleEnterpriseLogin(payload = {}) {
   const companyName = String(payload.companyName || '').trim()
   const phone = String(payload.phone || '').trim()
   if (!companyName || !phone) {
-    throw new Error('Company name and phone are required')
+    throw new Error('请输入企业名称和手机号')
   }
 
   const enterprise = await one(
@@ -419,7 +440,7 @@ async function handleEnterpriseLogin(payload = {}) {
   )
 
   if (!enterprise) {
-    throw new Error('Invalid company name or phone')
+    throw new Error('企业名称或手机号错误')
   }
 
   await updateById('enterprises', enterprise.id, {
@@ -440,20 +461,20 @@ async function handleEnterpriseRegister(payload = {}) {
   const phone = String(payload.phone || '').trim()
   const district = String(payload.district || '').trim()
 
-  if (!companyName) throw new Error('Company name is required')
-  if (!creditCode || creditCode.length !== 18) throw new Error('Credit code must be 18 characters')
-  if (!legalPerson) throw new Error('Legal person is required')
-  if (!/^1[3-9]\d{9}$/.test(phone)) throw new Error('Invalid phone number')
-  if (!district) throw new Error('District is required')
+  if (!companyName) throw new Error('请输入企业名称')
+  if (!creditCode || creditCode.length !== 18) throw new Error('统一社会信用代码必须为 18 位')
+  if (!legalPerson) throw new Error('请输入企业法人')
+  if (!/^1[3-9]\d{9}$/.test(phone)) throw new Error('请输入正确的手机号')
+  if (!district) throw new Error('请选择所在辖区')
 
   const duplicate = await one(
     'SELECT * FROM enterprises WHERE companyName = :companyName OR creditCode = :creditCode OR phone = :phone LIMIT 1',
     { companyName, creditCode, phone }
   )
 
-  if (duplicate?.companyName === companyName) throw new Error('Company already exists')
-  if (duplicate?.creditCode === creditCode) throw new Error('Credit code already exists')
-  if (duplicate?.phone === phone) throw new Error('Phone number already exists')
+  if (duplicate?.companyName === companyName) throw new Error('企业名称已存在')
+  if (duplicate?.creditCode === creditCode) throw new Error('统一社会信用代码已存在')
+  if (duplicate?.phone === phone) throw new Error('手机号已存在')
 
   const now = formatDateTime()
   const enterprise = {
@@ -497,6 +518,12 @@ async function handleGetEnterpriseDashboard(payload = {}, session) {
     })
   ])
 
+  const reminders = buildReminders(records, {
+    days: 30,
+    limit: 6,
+    phoneMap: new Map([[companyName, enterprise.phone || '']])
+  })
+
   return {
     summary: {
       equipmentCount: equipments.length,
@@ -525,7 +552,8 @@ async function handleGetEnterpriseDashboard(payload = {}, session) {
         equipmentName: item.equipmentName || '',
         equipmentNo: item.equipmentNo || '',
         location: item.location || ''
-      }))
+      })),
+    reminders
   }
 }
 
@@ -558,7 +586,7 @@ async function handleSaveEnterpriseEquipment(payload = {}, session) {
   const companyName = buildEnterpriseScope(enterprise)
   const data = payload.data || {}
   const equipmentName = String(data.equipmentName || '').trim()
-  if (!equipmentName) throw new Error('Equipment name is required')
+  if (!equipmentName) throw new Error('设备名称不能为空')
 
   const now = formatDateTime()
   const row = {
@@ -595,12 +623,12 @@ async function handleDeleteEnterpriseEquipment(payload = {}, session) {
   const enterprise = assertEnterpriseSession(session)
   const companyName = buildEnterpriseScope(enterprise)
   const targetId = String(payload.id || '').trim()
-  if (!targetId) throw new Error('Equipment id is required')
+  if (!targetId) throw new Error('设备编号不能为空')
 
   return withTransaction(async (connection) => {
     const current = await one('SELECT * FROM equipments WHERE id = :id LIMIT 1', { id: targetId }, connection)
     if (!current || current.enterpriseName !== companyName) {
-      throw new Error('Equipment not found or access denied')
+      throw new Error('设备不存在或无权操作')
     }
 
     const now = formatDateTime()
@@ -641,7 +669,14 @@ async function handleGetEnterpriseGauges(payload = {}, session) {
   return {
     list: list
       .filter((item) => !status || item.status === status)
-      .filter((item) => matchKeyword([item.deviceName, item.deviceNo, item.factoryNo, item.equipmentName, item.modelSpec], keyword))
+      .filter((item) => matchKeyword([
+        item.deviceName,
+        item.deviceNo,
+        item.factoryNo,
+        item.equipmentName,
+        item.modelSpec,
+        item.installLocation
+      ], keyword))
       .map((item) => ({
         _id: item.id,
         deviceName: item.deviceName || '',
@@ -649,6 +684,7 @@ async function handleGetEnterpriseGauges(payload = {}, session) {
         factoryNo: item.factoryNo || '',
         equipmentId: item.equipmentId || '',
         equipmentName: item.equipmentName || '',
+        installLocation: item.installLocation || '',
         status: item.status || '',
         manufacturer: item.manufacturer || '',
         modelSpec: item.modelSpec || '',
@@ -680,7 +716,8 @@ async function handleGetEnterpriseRecords(payload = {}, session) {
         item.factoryNo,
         item.instrumentName,
         item.equipmentName,
-        item.deviceName
+        item.deviceName,
+        item.installLocation
       ], keyword))
       .map((item) => ({
         _id: item.id,
@@ -688,6 +725,7 @@ async function handleGetEnterpriseRecords(payload = {}, session) {
         factoryNo: item.factoryNo || '',
         instrumentName: item.instrumentName || '',
         equipmentName: item.equipmentName || '',
+        installLocation: item.installLocation || '',
         conclusion: item.conclusion || '',
         verificationDate: formatDate(item.verificationDate),
         expiryDate: formatDate(item.expiryDate),
@@ -696,26 +734,46 @@ async function handleGetEnterpriseRecords(payload = {}, session) {
   }
 }
 
+async function handleSendReminderSms(payload = {}, session) {
+  if (!session || !['admin', 'enterprise'].includes(session.userType)) {
+    const error = new Error('短信提醒需要登录后使用')
+    error.statusCode = 401
+    throw error
+  }
+
+  return createSmsPlaceholder(payload, session, config.sms)
+}
+
+async function handleParseEnterpriseExcel(payload = {}, session) {
+  assertEnterpriseSession(session)
+  return parseEnterpriseExcel(payload)
+}
+
 async function handleSaveEnterpriseAiRecord(payload = {}, session) {
   const enterprise = assertEnterpriseSession(session)
   const companyName = buildEnterpriseScope(enterprise)
   const extractedData = payload.extractedData || {}
   const equipmentId = String(payload.equipmentId || '').trim()
   const fileID = String(payload.fileID || '').trim()
-  if (!equipmentId) throw new Error('Equipment id is required')
+  if (!equipmentId) throw new Error('请选择所属设备')
 
   const parsedVerificationDate = parseDateInput(extractedData.verificationDate)
   if (!parsedVerificationDate) {
-    throw new Error('Verification date is required')
+    throw new Error('检定日期不能为空')
+  }
+
+  const installLocation = String(payload.installLocation || extractedData.installLocation || '').trim()
+  if (!installLocation) {
+    throw new Error('请填写该压力表的安装位置')
   }
 
   return withTransaction(async (connection) => {
     const equipment = await one('SELECT * FROM equipments WHERE id = :id LIMIT 1', { id: equipmentId }, connection)
     if (!equipment || equipment.isDeleted) {
-      throw new Error('Equipment not found')
+      throw new Error('所属设备不存在')
     }
     if (equipment.enterpriseName !== companyName) {
-      throw new Error('Equipment access denied')
+      throw new Error('无权保存到该设备')
     }
 
     const now = formatDateTime()
@@ -749,7 +807,7 @@ async function handleSaveEnterpriseAiRecord(payload = {}, session) {
       status: gaugeStatus,
       manufacturer,
       modelSpec,
-      installLocation: equipment.location || '',
+      installLocation,
       recordCount: 1,
       isDeleted: 0,
       deletedAt: '',
@@ -792,7 +850,8 @@ async function handleSaveEnterpriseAiRecord(payload = {}, session) {
       deviceId,
       deviceName,
       deviceNo,
-      deviceStatus: gaugeStatus
+      deviceStatus: gaugeStatus,
+      installLocation
     }, connection)
 
     const countRow = await one(
@@ -829,6 +888,8 @@ async function handleAdminAction(action, payload = {}, session = null) {
   if (action === 'deleteEnterpriseEquipment') return handleDeleteEnterpriseEquipment(payload, session)
   if (action === 'getEnterpriseGauges') return handleGetEnterpriseGauges(payload, session)
   if (action === 'getEnterpriseRecords') return handleGetEnterpriseRecords(payload, session)
+  if (action === 'sendReminderSms') return handleSendReminderSms(payload, session)
+  if (action === 'parseEnterpriseExcel') return handleParseEnterpriseExcel(payload, session)
   if (action === 'saveEnterpriseAiRecord') return handleSaveEnterpriseAiRecord(payload, session)
 
   throw new Error(`Unsupported admin action: ${action}`)

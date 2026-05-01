@@ -2,12 +2,17 @@
   <div class="enterprise-page">
     <div class="page-header">
       <h1 class="page-title">压力表台账</h1>
-      <p class="page-subtitle">查看企业压力表和检定记录。新增识别建档仍建议先使用小程序 AI 管家。</p>
+      <p class="page-subtitle">查看企业压力表和检定记录，安装位置会随台账一起保存和展示。</p>
     </div>
 
     <section class="card-shell table-panel">
       <div class="toolbar">
-        <el-input v-model="keyword" clearable placeholder="搜索压力表名称、出厂编号、所属设备" @keyup.enter="loadData" />
+        <el-input
+          v-model="keyword"
+          clearable
+          placeholder="搜索压力表名称、出厂编号、所属设备或安装位置"
+          @keyup.enter="loadData"
+        />
         <el-select v-model="status" clearable placeholder="状态" style="width: 150px">
           <el-option label="在用" value="在用" />
           <el-option label="备用" value="备用" />
@@ -25,10 +30,13 @@
             <el-table-column prop="deviceNo" label="压力表编号" min-width="150" />
             <el-table-column prop="factoryNo" label="出厂编号" min-width="130" />
             <el-table-column prop="equipmentName" label="所属设备" min-width="150" />
+            <el-table-column prop="installLocation" label="安装位置" min-width="180" />
             <el-table-column prop="modelSpec" label="型号规格" min-width="140" />
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="row.status === '在用' ? 'success' : 'info'" size="small">{{ row.status || '-' }}</el-tag>
+                <el-tag :type="row.status === '在用' ? 'success' : 'info'" size="small">
+                  {{ row.status || '-' }}
+                </el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -39,6 +47,7 @@
             <el-table-column prop="factoryNo" label="出厂编号" min-width="130" />
             <el-table-column prop="instrumentName" label="仪表名称" min-width="150" />
             <el-table-column prop="equipmentName" label="所属设备" min-width="150" />
+            <el-table-column prop="installLocation" label="安装位置" min-width="180" />
             <el-table-column prop="conclusion" label="结论" width="100" />
             <el-table-column prop="verificationDate" label="检定日期" width="120" />
             <el-table-column prop="expiryDate" label="到期日期" width="120" />
@@ -61,7 +70,7 @@ const status = ref('')
 const gauges = ref([])
 const records = ref([])
 
-const loadData = async () => {
+async function loadData() {
   const [gaugeRes, recordRes] = await Promise.all([
     getEnterpriseGauges(userStore.user, { keyword: keyword.value, status: status.value }),
     getEnterpriseRecords(userStore.user, { keyword: keyword.value })
@@ -85,7 +94,14 @@ onMounted(loadData)
   margin-bottom: 18px;
 
   .el-input {
-    max-width: 360px;
+    max-width: 420px;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

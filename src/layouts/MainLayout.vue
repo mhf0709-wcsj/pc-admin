@@ -6,8 +6,8 @@
           <el-icon :size="24"><Monitor /></el-icon>
         </div>
         <div v-show="!isCollapsed" class="logo-copy">
-          <span class="logo-badge">{{ userStore.isEnterprise ? 'Enterprise Web' : 'Regulator Web' }}</span>
-          <span class="logo-text">{{ userStore.isEnterprise ? '企业网页端' : '监管网页端' }}</span>
+          <span class="logo-badge">{{ userStore.isEnterprise ? '企业网页端' : '监管网页端' }}</span>
+          <span class="logo-text">{{ userStore.isEnterprise ? '企业工作台' : '监管后台' }}</span>
         </div>
       </div>
 
@@ -70,15 +70,15 @@
             <component :is="isCollapsed ? 'Expand' : 'Fold'" />
           </el-icon>
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/' }">{{ userStore.isEnterprise ? '企业端' : '网页监管' }}</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/' }">
+              {{ userStore.isEnterprise ? '企业端' : '网页监管' }}
+            </el-breadcrumb-item>
             <el-breadcrumb-item>{{ currentTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
 
         <div class="header-right">
-          <div class="scope-chip">
-            {{ scopeText }}
-          </div>
+          <div class="scope-chip">{{ scopeText }}</div>
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-avatar :size="32" class="avatar">
@@ -115,8 +115,19 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ArrowDown,
+  ChatDotRound,
+  DataBoard,
+  Document,
+  Monitor,
+  OfficeBuilding,
+  Setting,
+  SwitchButton,
+  TrendCharts
+} from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
@@ -125,14 +136,16 @@ const isCollapsed = ref(false)
 
 const activeMenu = computed(() => route.path)
 const currentTitle = computed(() => route.meta.title || '')
-const displayName = computed(() => userStore.isEnterprise ? userStore.user?.companyName : userStore.user?.username)
+const displayName = computed(() => (
+  userStore.isEnterprise ? userStore.user?.companyName : userStore.user?.username
+))
 const avatarText = computed(() => String(displayName.value || 'U').slice(0, 1).toUpperCase())
 const scopeText = computed(() => {
   if (userStore.isEnterprise) return userStore.user?.district || '企业端'
-  return userStore.isDistrictAdmin ? `${userStore.adminDistrict}辖区` : '总管理员'
+  return userStore.isDistrictAdmin ? `${userStore.adminDistrict} 辖区` : '总管理员'
 })
 
-const handleCommand = (command) => {
+function handleCommand(command) {
   if (command === 'logout') {
     ElMessageBox.confirm('确定要退出当前网页登录吗？', '提示', {
       confirmButtonText: '确认退出',
@@ -202,8 +215,7 @@ const handleCommand = (command) => {
 
   .logo-badge {
     font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
     color: #94a3b8;
   }
 

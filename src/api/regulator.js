@@ -52,6 +52,17 @@ export function getEnterpriseRecords(enterprise, filters = {}) {
   return callAdminFunction('getEnterpriseRecords', { enterprise, ...filters })
 }
 
+export function sendReminderSms(scope, payload = {}) {
+  return callAdminFunction('sendReminderSms', {
+    scope,
+    ...payload
+  })
+}
+
+export function parseEnterpriseExcel(enterprise, payload = {}) {
+  return callAdminFunction('parseEnterpriseExcel', { enterprise, ...payload })
+}
+
 export function saveEnterpriseAiRecord(enterprise, payload) {
   return callAdminFunction('saveEnterpriseAiRecord', { enterprise, ...payload })
 }

@@ -2,7 +2,9 @@
   <div class="enterprise-page">
     <div class="page-header">
       <h1 class="page-title">企业工作台</h1>
-      <p class="page-subtitle">{{ userStore.user?.companyName }} 的设备、压力表和检定记录概览。</p>
+      <p class="page-subtitle">
+        {{ userStore.user?.companyName || '当前企业' }} 的设备、压力表和检定记录总览。
+      </p>
     </div>
 
     <section class="summary-grid">
@@ -17,7 +19,7 @@
         <div class="panel-head">
           <div>
             <h3>待绑定设备</h3>
-            <p>设备没有绑定压力表时，会影响企业台账完整性。</p>
+            <p>设备还没有绑定压力表时，会影响企业台账完整性。</p>
           </div>
           <el-button type="primary" link @click="$router.push('/enterprise/equipments')">去处理</el-button>
         </div>
@@ -48,15 +50,51 @@
         </el-table>
       </article>
     </section>
+
+    <el-dialog
+      v-model="reminderDialogVisible"
+      title="30 天内到期提醒"
+      width="720px"
+      destroy-on-close
+    >
+      <div class="reminder-summary">
+        当前有 {{ dashboard.reminders.length }} 条压力表即将在 30 天内到期，建议尽快安排送检。
+      </div>
+
+      <el-table :data="dashboard.reminders" stripe>
+        <el-table-column prop="instrumentName" label="仪表名称" min-width="150" />
+        <el-table-column prop="certNo" label="证书编号" min-width="150" />
+        <el-table-column prop="expiryDate" label="到期日期" width="120" />
+        <el-table-column prop="statusLabel" label="提醒状态" width="120" />
+        <el-table-column label="短信提醒" width="150">
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              :disabled="!row.phone"
+              @click="triggerSmsReminder(row)"
+            >
+              {{ row.phone ? '预留短信接口' : '未留手机号' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <template #footer>
+        <el-button @click="dismissReminderDialog">我知道了</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
-import { getEnterpriseDashboard } from '@/api/regulator'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getEnterpriseDashboard, sendReminderSms } from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
+const reminderDialogVisible = ref(false)
 
 const dashboard = reactive({
   summary: {
@@ -68,21 +106,54 @@ const dashboard = reactive({
     unboundCount: 0
   },
   recentRecords: [],
-  unboundEquipments: []
+  unboundEquipments: [],
+  reminders: []
 })
 
 const cards = computed(() => [
   { key: 'equipment', label: '设备', value: dashboard.summary.equipmentCount, tone: '' },
   { key: 'gauge', label: '压力表', value: dashboard.summary.gaugeCount, tone: '' },
-  { key: 'expired', label: '逾期', value: dashboard.summary.expiredCount, tone: 'danger' },
-  { key: 'inactive', label: '停用/报废', value: dashboard.summary.inactiveCount, tone: 'warning' }
+  { key: 'expired', label: '已过期', value: dashboard.summary.expiredCount, tone: 'danger' },
+  { key: 'inactive', label: '停用 / 报废', value: dashboard.summary.inactiveCount, tone: 'warning' }
 ])
 
-const loadData = async () => {
+function getReminderStorageKey() {
+  const today = new Date().toLocaleDateString('sv-SE')
+  const companyName = userStore.user?.companyName || 'enterprise'
+  return `pc-admin:enterprise-reminder:${companyName}:${today}`
+}
+
+function maybeOpenReminderDialog() {
+  if (!dashboard.reminders.length) return
+  if (localStorage.getItem(getReminderStorageKey())) return
+  reminderDialogVisible.value = true
+}
+
+function dismissReminderDialog() {
+  reminderDialogVisible.value = false
+  localStorage.setItem(getReminderStorageKey(), '1')
+}
+
+async function triggerSmsReminder(row) {
+  try {
+    const result = await sendReminderSms('enterprise', {
+      scene: 'enterprise_expiry_notice',
+      recipients: row.phone ? [row.phone] : [],
+      message: `${row.instrumentName || '压力表'} 将于 ${row.expiryDate} 到期，请尽快安排送检。`
+    })
+    ElMessage.success(result.message || '短信提醒接口已预留')
+  } catch (error) {
+    ElMessage.error(error.message || '短信提醒发送失败')
+  }
+}
+
+async function loadData() {
   const result = await getEnterpriseDashboard(userStore.user)
   dashboard.summary = result.summary || dashboard.summary
   dashboard.recentRecords = result.recentRecords || []
   dashboard.unboundEquipments = result.unboundEquipments || []
+  dashboard.reminders = result.reminders || []
+  maybeOpenReminderDialog()
 }
 
 onMounted(loadData)
@@ -147,6 +218,29 @@ onMounted(loadData)
   p {
     margin-top: 8px;
     color: var(--text-sub);
+  }
+}
+
+.reminder-summary {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 247, 237, 0.9);
+  color: #9a3412;
+  line-height: 1.7;
+}
+
+@media (max-width: 1200px) {
+  .summary-grid,
+  .content-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-grid,
+  .content-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

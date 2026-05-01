@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS pressure_records (
   createdBy VARCHAR(80) DEFAULT '',
   equipmentId VARCHAR(64) DEFAULT '',
   equipmentName VARCHAR(200) DEFAULT '',
+  installLocation VARCHAR(240) DEFAULT '',
   deviceId VARCHAR(64) DEFAULT '',
   deviceName VARCHAR(200) DEFAULT '',
   deviceNo VARCHAR(100) DEFAULT '',

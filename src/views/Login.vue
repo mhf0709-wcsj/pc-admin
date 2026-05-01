@@ -2,13 +2,30 @@
   <div class="login-page">
     <div class="login-shell">
       <section class="hero-panel">
-        <div class="hero-badge">Pressure Gauge Web</div>
-        <h1>压力表智能管理网页端</h1>
-        <p>网页端与小程序共用同一套云开发数据。监管人员可以查看企业和台账，企业用户可以维护设备、压力表和检定记录。</p>
-        <div class="hero-points">
-          <div class="point">监管端：风险概览、台账中心、企业管理</div>
-          <div class="point">企业端：设备台账、压力表台账、检定记录</div>
-          <div class="point">同库互通：小程序录入的数据网页端同步可见</div>
+        <div>
+          <div class="hero-badge">Pressure Gauge Web</div>
+          <h1>压力表智能管理网页端</h1>
+          <p>
+            网页端与小程序共用同一套业务数据。监管端可查看风险、台账和企业情况，企业端可维护设备、
+            压力表与检定记录。
+          </p>
+
+          <div class="hero-points">
+            <div class="point">监管端：监管概览、台账中心、企业管理、统计分析</div>
+            <div class="point">企业端：AI 管家、设备台账、压力表台账、检定记录联动</div>
+            <div class="point">数据互通：小程序录入的数据会同步到网页端</div>
+          </div>
+        </div>
+
+        <div class="hero-footer">
+          <div class="hint-card">
+            <span>本地调试默认账号</span>
+            <strong>admin / admin123</strong>
+          </div>
+          <div class="hint-card">
+            <span>企业端支持</span>
+            <strong>手机号登录与企业注册</strong>
+          </div>
         </div>
       </section>
 
@@ -16,7 +33,13 @@
         <div class="form-head">
           <div class="mark">{{ activeTab === 'admin' ? '监管端登录' : '企业端登录' }}</div>
           <h2>{{ activeTab === 'admin' ? '进入监管后台' : '进入企业工作台' }}</h2>
-          <p>{{ activeTab === 'admin' ? '使用管理端账号登录，查看全部或辖区范围内的数据。' : '使用企业名称和法人手机号登录，数据与小程序企业端互通。' }}</p>
+          <p>
+            {{
+              activeTab === 'admin'
+                ? '使用管理员账号登录，查看全部或辖区范围内的风险、企业和检定记录。'
+                : '使用企业名称和法人手机号登录，数据与小程序企业端互通。'
+            }}
+          </p>
         </div>
 
         <el-tabs v-model="activeTab" stretch class="login-tabs">
@@ -33,7 +56,12 @@
           @submit.prevent="handleAdminLogin"
         >
           <el-form-item prop="username">
-            <el-input v-model="adminForm.username" placeholder="请输入管理账号" size="large" :prefix-icon="User" />
+            <el-input
+              v-model="adminForm.username"
+              placeholder="请输入管理员账号"
+              size="large"
+              :prefix-icon="User"
+            />
           </el-form-item>
           <el-form-item prop="password">
             <el-input
@@ -51,6 +79,9 @@
               登录监管端
             </el-button>
           </el-form-item>
+          <div class="help-text">
+            本地调试可直接使用 <strong>admin</strong> / <strong>admin123</strong>
+          </div>
         </el-form>
 
         <el-form
@@ -62,7 +93,12 @@
           @submit.prevent="handleEnterpriseLogin"
         >
           <el-form-item prop="companyName">
-            <el-input v-model="enterpriseForm.companyName" placeholder="请输入企业名称" size="large" :prefix-icon="OfficeBuilding" />
+            <el-input
+              v-model="enterpriseForm.companyName"
+              placeholder="请输入企业名称"
+              size="large"
+              :prefix-icon="OfficeBuilding"
+            />
           </el-form-item>
           <el-form-item prop="phone">
             <el-input
@@ -93,7 +129,7 @@
           <el-input v-model="registerForm.companyName" placeholder="请输入企业全称" />
         </el-form-item>
         <el-form-item label="统一社会信用代码" prop="creditCode">
-          <el-input v-model="registerForm.creditCode" maxlength="18" placeholder="请输入18位信用代码" />
+          <el-input v-model="registerForm.creditCode" maxlength="18" placeholder="请输入 18 位统一社会信用代码" />
         </el-form-item>
         <el-form-item label="企业法人" prop="legalPerson">
           <el-input v-model="registerForm.legalPerson" placeholder="请输入法人姓名" />
@@ -120,6 +156,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Iphone, Lock, OfficeBuilding, User } from '@element-plus/icons-vue'
+import { districts } from '@/api/config'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -132,7 +169,7 @@ const adminFormRef = ref()
 const enterpriseFormRef = ref()
 const registerFormRef = ref()
 
-const districtOptions = ['大峃所', '珊溪所', '峃口所', '黄坦所', '西坑所', '玉壶所', '南田所', '百丈漈所']
+const districtOptions = districts.filter((item) => item !== '全部辖区')
 
 const adminForm = reactive({
   username: '',
@@ -161,7 +198,7 @@ const phoneRule = {
 }
 
 const adminRules = {
-  username: [{ required: true, message: '请输入管理账号', trigger: 'blur' }],
+  username: [{ required: true, message: '请输入管理员账号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入登录密码', trigger: 'blur' }]
 }
 
@@ -174,14 +211,14 @@ const registerRules = {
   companyName: [{ required: true, message: '请输入企业名称', trigger: 'blur' }],
   creditCode: [
     { required: true, message: '请输入统一社会信用代码', trigger: 'blur' },
-    { min: 18, max: 18, message: '统一社会信用代码应为18位', trigger: 'blur' }
+    { min: 18, max: 18, message: '统一社会信用代码应为 18 位', trigger: 'blur' }
   ],
   legalPerson: [{ required: true, message: '请输入企业法人', trigger: 'blur' }],
   phone: [{ required: true, message: '请输入法人手机号', trigger: 'blur' }, phoneRule],
   district: [{ required: true, message: '请选择辖区', trigger: 'change' }]
 }
 
-const handleAdminLogin = async () => {
+async function handleAdminLogin() {
   const valid = await adminFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -199,7 +236,7 @@ const handleAdminLogin = async () => {
   }
 }
 
-const handleEnterpriseLogin = async () => {
+async function handleEnterpriseLogin() {
   const valid = await enterpriseFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -217,7 +254,7 @@ const handleEnterpriseLogin = async () => {
   }
 }
 
-const handleRegister = async () => {
+async function handleRegister() {
   const valid = await registerFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -316,6 +353,31 @@ const handleRegister = async () => {
   font-weight: 600;
 }
 
+.hero-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.hint-card {
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.05);
+
+  span {
+    display: block;
+    color: var(--text-sub);
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+
+  strong {
+    color: var(--text-main);
+    font-size: 18px;
+  }
+}
+
 .form-panel {
   padding: 40px 36px;
   display: flex;
@@ -360,6 +422,16 @@ const handleRegister = async () => {
   font-weight: 700;
 }
 
+.help-text {
+  text-align: center;
+  color: var(--text-sub);
+  font-size: 14px;
+
+  strong {
+    color: var(--text-main);
+  }
+}
+
 .register-line {
   display: flex;
   align-items: center;
@@ -367,5 +439,35 @@ const handleRegister = async () => {
   gap: 4px;
   color: var(--text-sub);
   font-size: 14px;
+}
+
+@media (max-width: 1100px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel,
+  .form-panel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    padding: 18px;
+  }
+
+  .hero-panel,
+  .form-panel {
+    padding: 24px;
+  }
+
+  .hero-panel h1 {
+    font-size: 38px;
+  }
+
+  .hero-footer {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

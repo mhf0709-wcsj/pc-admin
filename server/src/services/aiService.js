@@ -2,6 +2,10 @@ const axios = require('axios')
 const config = require('../config')
 const { getKnowledgeBase, getRelevantKnowledge } = require('./knowledge')
 
+function logAiStage(stage, details = {}) {
+  console.log(`[ai.service] ${stage}`, details)
+}
+
 function normalizeText(text) {
   return String(text || '')
     .replace(/\r/g, '\n')
@@ -98,7 +102,7 @@ function heuristicExtractRecord(text) {
   return result
 }
 
-async function callDashScope(messages, responseFormat = null) {
+async function callDashScope(messages, responseFormat = null, meta = {}) {
   if (!config.dashscope.apiKey) return ''
 
   const body = {
@@ -111,15 +115,45 @@ async function callDashScope(messages, responseFormat = null) {
     body.response_format = responseFormat
   }
 
-  const response = await axios.post(config.dashscope.endpoint, body, {
-    timeout: 60000,
-    headers: {
-      Authorization: `Bearer ${config.dashscope.apiKey}`,
-      'Content-Type': 'application/json'
-    }
+  const startedAt = Date.now()
+  const requestId = meta.requestId || 'unknown'
+  logAiStage('dashscope.start', {
+    requestId,
+    scene: meta.scene || 'unknown',
+    model: config.dashscope.model,
+    messageCount: Array.isArray(messages) ? messages.length : 0,
+    responseFormat: responseFormat?.type || 'text'
   })
 
-  return response?.data?.choices?.[0]?.message?.content || ''
+  try {
+    const response = await axios.post(config.dashscope.endpoint, body, {
+      timeout: 60000,
+      headers: {
+        Authorization: `Bearer ${config.dashscope.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const content = response?.data?.choices?.[0]?.message?.content || ''
+    logAiStage('dashscope.success', {
+      requestId,
+      scene: meta.scene || 'unknown',
+      durationMs: Date.now() - startedAt,
+      contentLength: String(content || '').length
+    })
+    return content
+  } catch (error) {
+    logAiStage('dashscope.error', {
+      requestId,
+      scene: meta.scene || 'unknown',
+      durationMs: Date.now() - startedAt,
+      message: error?.message || 'Unknown error',
+      code: error?.code || '',
+      status: error?.response?.status || '',
+      data: error?.response?.data || null
+    })
+    throw error
+  }
 }
 
 function parseJsonSafely(content) {
@@ -137,9 +171,25 @@ function parseJsonSafely(content) {
   }
 }
 
-async function extractRecordFromText(ocrText) {
+async function extractRecordFromText(ocrText, meta = {}) {
   const fallback = heuristicExtractRecord(ocrText)
+  const requestId = meta.requestId || 'unknown'
+  const normalizedText = normalizeText(ocrText)
+  const textLength = normalizedText.length
+  const lineCount = normalizedText ? normalizedText.split('\n').filter(Boolean).length : 0
+
+  logAiStage('extractRecord.start', {
+    requestId,
+    textLength,
+    lineCount,
+    mayBeTooLong: textLength > 12000
+  })
+
   if (!config.dashscope.apiKey) {
+    logAiStage('extractRecord.noProvider', {
+      requestId,
+      reason: 'dashscope api key is missing'
+    })
     return fallback
   }
 
@@ -157,11 +207,19 @@ async function extractRecordFromText(ocrText) {
       },
       {
         role: 'user',
-        content: `Extract fields from the following OCR text:\n${normalizeText(ocrText)}`
+        content: `Extract fields from the following OCR text:\n${normalizedText}`
       }
-    ], { type: 'json_object' })
+    ], { type: 'json_object' }, {
+      requestId,
+      scene: 'extractRecordFromImage'
+    })
 
     const parsed = parseJsonSafely(content) || {}
+    logAiStage('extractRecord.parsed', {
+      requestId,
+      parsedKeys: Object.keys(parsed),
+      usedFallback: !Object.keys(parsed).length
+    })
     return {
       ...fallback,
       certNo: parsed.certNo || fallback.certNo,
@@ -176,6 +234,11 @@ async function extractRecordFromText(ocrText) {
       gaugeStatus: parsed.gaugeStatus || fallback.gaugeStatus
     }
   } catch (error) {
+    logAiStage('extractRecord.fallback', {
+      requestId,
+      reason: error?.message || 'Unknown error',
+      code: error?.code || ''
+    })
     return fallback
   }
 }
@@ -187,7 +250,7 @@ function buildScopeLabel(session) {
   return String(session.userType || 'guest')
 }
 
-async function answerQuestion(payload = {}, session) {
+async function answerQuestion(payload = {}, session, meta = {}) {
   const question = String(payload.question || '').trim()
   if (!question) {
     return { success: true, answer: 'Please enter a question.' }
@@ -225,7 +288,10 @@ async function answerQuestion(payload = {}, session) {
         `Reference material:\n${knowledge}`
       ].filter(Boolean).join('\n\n')
     }
-  ])
+  ], null, {
+    requestId: meta.requestId,
+    scene: 'answerQuestion'
+  })
 
   return {
     success: true,
@@ -233,13 +299,13 @@ async function answerQuestion(payload = {}, session) {
   }
 }
 
-async function handleAiPayload(payload = {}, session) {
+async function handleAiPayload(payload = {}, session, meta = {}) {
   if (payload.action === 'extractRecordFromImage') {
-    const data = await extractRecordFromText(String(payload.ocrText || '').trim())
+    const data = await extractRecordFromText(String(payload.ocrText || '').trim(), meta)
     return { success: true, data }
   }
 
-  return answerQuestion(payload, session)
+  return answerQuestion(payload, session, meta)
 }
 
 module.exports = {
