@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visibleProxy" title="记录详情" size="560px" destroy-on-close>
+  <el-drawer v-model="visibleProxy" title="记录详情" size="620px" destroy-on-close>
     <template v-if="activeRecord">
       <section class="detail-hero">
         <div>
@@ -9,52 +9,82 @@
         <el-tag :type="riskTagType" effect="dark">{{ riskLabel }}</el-tag>
       </section>
 
-      <el-descriptions :column="1" border class="detail-grid">
-        <el-descriptions-item label="证书编号">{{ activeRecord.certNo || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="出厂编号">{{ activeRecord.factoryNo || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="企业名称">{{ activeRecord.enterpriseName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="送检单位">{{ activeRecord.sendUnit || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="设备名称">{{ activeRecord.equipmentName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="仪表名称">{{ activeRecord.instrumentName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="辖区">{{ activeRecord.district || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="检定结论">{{ activeRecord.conclusion || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="检定日期">{{ activeRecord.verificationDate || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="到期日期">{{ activeRecord.expiryDate || '-' }}</el-descriptions-item>
-      </el-descriptions>
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="详情" name="detail">
+          <el-descriptions :column="1" border class="detail-grid">
+            <el-descriptions-item label="证书编号">{{ activeRecord.certNo || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="出厂编号">{{ activeRecord.factoryNo || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="企业名称">{{ activeRecord.enterpriseName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="送检单位">{{ activeRecord.sendUnit || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="设备名称">{{ activeRecord.equipmentName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="仪表名称">{{ activeRecord.instrumentName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="辖区">{{ activeRecord.district || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="检定结论">{{ activeRecord.conclusion || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="检定日期">{{ activeRecord.verificationDate || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="到期日期">{{ activeRecord.expiryDate || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="安装位置">{{ activeRecord.installLocation || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="处置状态">{{ riskStatusLabel(activeRecord.riskStatus) }}</el-descriptions-item>
+          </el-descriptions>
 
-      <section class="context-section">
-        <div class="context-head">
-          <div>
-            <h4>同证书编号记录</h4>
-            <p>帮助判断是否存在同一证书编号的历史或相邻记录。</p>
+          <div class="drawer-actions">
+            <el-button @click="emitRecords">查看该企业全部台账</el-button>
+            <el-button type="primary" @click="startEdit">修正记录</el-button>
           </div>
-          <el-button text type="primary" :loading="contextLoading" @click="loadContextRecords">
-            刷新
-          </el-button>
-        </div>
+        </el-tab-pane>
 
-        <div v-loading="contextLoading" class="context-shell">
-          <div v-if="sameCertRecords.length" class="context-list">
-            <button
-              v-for="item in sameCertRecords"
-              :key="contextKey(item, 'cert')"
-              type="button"
-              class="context-item"
-              @click="selectContextRecord(item)"
-            >
-              <div class="context-item-main">
-                <strong>{{ item.certNo || '未填写证书编号' }}</strong>
-                <span>{{ item.verificationDate || '-' }}</span>
-              </div>
-              <div class="context-item-meta">
-                <span>{{ item.conclusion || '未知' }}</span>
-                <span>{{ item.expiryDate || '-' }}</span>
-              </div>
-            </button>
+        <el-tab-pane label="修正记录" name="edit">
+          <el-form :model="editForm" label-width="92px" class="edit-form">
+            <el-form-item label="证书编号"><el-input v-model="editForm.certNo" /></el-form-item>
+            <el-form-item label="出厂编号"><el-input v-model="editForm.factoryNo" /></el-form-item>
+            <el-form-item label="企业名称"><el-input v-model="editForm.enterpriseName" /></el-form-item>
+            <el-form-item label="送检单位"><el-input v-model="editForm.sendUnit" /></el-form-item>
+            <el-form-item label="仪表名称"><el-input v-model="editForm.instrumentName" /></el-form-item>
+            <el-form-item label="型号规格"><el-input v-model="editForm.modelSpec" /></el-form-item>
+            <el-form-item label="制造单位"><el-input v-model="editForm.manufacturer" /></el-form-item>
+            <el-form-item label="检定依据"><el-input v-model="editForm.verificationStd" /></el-form-item>
+            <el-form-item label="检定结论">
+              <el-select v-model="editForm.conclusion">
+                <el-option label="合格" value="合格" />
+                <el-option label="不合格" value="不合格" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="检定日期"><el-date-picker v-model="editForm.verificationDate" value-format="YYYY-MM-DD" /></el-form-item>
+            <el-form-item label="到期日期"><el-date-picker v-model="editForm.expiryDate" value-format="YYYY-MM-DD" /></el-form-item>
+            <el-form-item label="辖区"><el-input v-model="editForm.district" /></el-form-item>
+            <el-form-item label="设备名称"><el-input v-model="editForm.equipmentName" /></el-form-item>
+            <el-form-item label="安装位置"><el-input v-model="editForm.installLocation" /></el-form-item>
+            <el-form-item label="处置状态">
+              <el-select v-model="editForm.riskStatus">
+                <el-option label="未处理" value="pending" />
+                <el-option label="已通知" value="notified" />
+                <el-option label="已复检" value="rechecked" />
+                <el-option label="已关闭" value="closed" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="修正说明">
+              <el-input v-model="editNote" type="textarea" :rows="3" placeholder="说明本次修正原因，便于后续审计" />
+            </el-form-item>
+          </el-form>
+
+          <div class="drawer-actions">
+            <el-button @click="activeTab = 'detail'">取消</el-button>
+            <el-button type="primary" :loading="saving" @click="saveEdit">保存修正</el-button>
           </div>
-          <el-empty v-else description="没有找到同证书编号的其他记录" />
-        </div>
-      </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="修改历史" name="history">
+          <div v-loading="historyLoading" class="history-list">
+            <article v-for="item in revisionLogs" :key="item.id" class="history-card">
+              <div class="history-head">
+                <strong>{{ item.operatorName || '系统' }}</strong>
+                <span>{{ item.createTime }}</span>
+              </div>
+              <p>{{ item.note || '未填写修正说明' }}</p>
+            </article>
+            <el-empty v-if="!revisionLogs.length && !historyLoading" description="暂无修改历史" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
 
       <section class="context-section">
         <div class="context-head">
@@ -62,23 +92,14 @@
             <h4>同企业最近风险记录</h4>
             <p>补充该企业最近的过期或即将到期记录，便于连续处理。</p>
           </div>
-          <el-tag size="small" effect="plain">{{ sameEnterpriseRiskRecords.length }} 条</el-tag>
+          <el-button text type="primary" :loading="contextLoading" @click="loadContextRecords">刷新</el-button>
         </div>
-
-        <el-alert
-          v-if="contextError"
-          type="warning"
-          :closable="false"
-          show-icon
-          class="context-alert"
-          :title="contextError"
-        />
 
         <div v-loading="contextLoading" class="context-shell">
           <div v-if="sameEnterpriseRiskRecords.length" class="context-list">
             <button
               v-for="item in sameEnterpriseRiskRecords"
-              :key="contextKey(item, 'enterprise')"
+              :key="contextKey(item)"
               type="button"
               class="context-item"
               @click="selectContextRecord(item)"
@@ -98,39 +119,51 @@
           <el-empty v-else description="没有可补充的同企业风险记录" />
         </div>
       </section>
-
-      <div class="drawer-actions">
-        <el-button type="primary" @click="emitRecords">查看该企业全部台账</el-button>
-      </div>
     </template>
   </el-drawer>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { getRecords } from '@/api/regulator'
+import { ElMessage } from 'element-plus'
+import { getRecordRevisionLogs, getRecords, updateRecord } from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  },
-  record: {
-    type: Object,
-    default: null
-  }
+  modelValue: { type: Boolean, default: false },
+  record: { type: Object, default: null }
 })
 
-const emit = defineEmits(['update:modelValue', 'records'])
+const emit = defineEmits(['update:modelValue', 'records', 'saved'])
 
 const userStore = useUserStore()
 const activeRecord = ref(null)
+const activeTab = ref('detail')
 const contextLoading = ref(false)
-const contextError = ref('')
-const sameCertRecords = ref([])
 const sameEnterpriseRiskRecords = ref([])
+const historyLoading = ref(false)
+const revisionLogs = ref([])
+const saving = ref(false)
+const editNote = ref('')
+
+const editForm = reactive({
+  certNo: '',
+  factoryNo: '',
+  enterpriseName: '',
+  sendUnit: '',
+  instrumentName: '',
+  modelSpec: '',
+  manufacturer: '',
+  verificationStd: '',
+  conclusion: '',
+  verificationDate: '',
+  expiryDate: '',
+  district: '',
+  equipmentName: '',
+  installLocation: '',
+  riskStatus: 'pending'
+})
 
 const visibleProxy = computed({
   get: () => props.modelValue,
@@ -144,32 +177,50 @@ watch(
   () => props.record,
   (value) => {
     activeRecord.value = value ? { ...value } : null
+    if (value) fillEditForm(value)
   },
   { immediate: true }
 )
 
 watch(
-  () => [props.modelValue, activeRecord.value?.certNo, activeRecord.value?.factoryNo, activeRecord.value?.enterpriseName],
+  () => [props.modelValue, activeRecord.value?._id],
   async ([visible]) => {
     if (visible && activeRecord.value) {
-      await loadContextRecords()
-      return
+      activeTab.value = 'detail'
+      await Promise.all([loadContextRecords(), loadRevisionLogs()])
     }
     if (!visible) {
-      resetContext()
+      sameEnterpriseRiskRecords.value = []
+      revisionLogs.value = []
     }
   },
   { immediate: true }
 )
 
-function resetContext() {
-  contextError.value = ''
-  sameCertRecords.value = []
-  sameEnterpriseRiskRecords.value = []
+function fillEditForm(record) {
+  Object.keys(editForm).forEach((key) => {
+    editForm[key] = record[key] || (key === 'riskStatus' ? 'pending' : '')
+  })
+  editNote.value = ''
+}
+
+function startEdit() {
+  fillEditForm(activeRecord.value)
+  activeTab.value = 'edit'
 }
 
 function emitRecords() {
   emit('records', activeRecord.value?.enterpriseName || '')
+}
+
+function riskStatusLabel(value) {
+  return {
+    pending: '未处理',
+    notified: '已通知',
+    rechecked: '已复检',
+    closed: '已关闭',
+    normal: '正常'
+  }[value || 'pending'] || '未处理'
 }
 
 function getRiskLabel(record) {
@@ -190,73 +241,80 @@ function getRiskTagType(record) {
 
 function isSameRecord(left, right) {
   if (!left || !right) return false
-  const leftKey = [left.certNo, left.factoryNo, left.enterpriseName, left.expiryDate, left.verificationDate].join('|')
-  const rightKey = [right.certNo, right.factoryNo, right.enterpriseName, right.expiryDate, right.verificationDate].join('|')
-  return leftKey === rightKey
+  return String(left._id || left.id || '') === String(right._id || right.id || '')
 }
 
-function contextKey(record, scope) {
-  return [scope, record.certNo, record.factoryNo, record.enterpriseName, record.verificationDate, record.expiryDate].join('|')
+function contextKey(record) {
+  return [record._id, record.certNo, record.factoryNo, record.expiryDate].join('|')
 }
 
-function selectContextRecord(record) {
+async function selectContextRecord(record) {
   activeRecord.value = { ...record }
+  fillEditForm(record)
+  activeTab.value = 'detail'
+  await Promise.all([loadContextRecords(), loadRevisionLogs()])
 }
 
 async function loadContextRecords() {
-  if (!activeRecord.value || !userStore.user) return
+  if (!activeRecord.value?.enterpriseName || !userStore.user) return
   contextLoading.value = true
-  contextError.value = ''
-
   try {
-    const certKeyword = activeRecord.value.certNo || activeRecord.value.factoryNo || ''
-    const enterpriseName = activeRecord.value.enterpriseName || ''
-
-    const [certResult, enterpriseResult] = await Promise.all([
-      certKeyword
-        ? getRecords(userStore.user, {
-            keyword: certKeyword,
-            page: 1,
-            pageSize: 8
-          })
-        : Promise.resolve({ list: [] }),
-      enterpriseName
-        ? getRecords(userStore.user, {
-            enterpriseName,
-            filterType: 'risk',
-            page: 1,
-            pageSize: 8
-          })
-        : Promise.resolve({ list: [] })
-    ])
-
-    const certList = (certResult.list || []).filter((item) => {
-      if (isSameRecord(item, activeRecord.value)) return false
-      if (activeRecord.value.certNo) return item.certNo === activeRecord.value.certNo
-      if (activeRecord.value.factoryNo) return item.factoryNo === activeRecord.value.factoryNo
-      return false
+    const result = await getRecords(userStore.user, {
+      enterpriseName: activeRecord.value.enterpriseName,
+      filterType: 'risk',
+      page: 1,
+      pageSize: 8
     })
-
-    const enterpriseRiskList = (enterpriseResult.list || []).filter((item) => !isSameRecord(item, activeRecord.value))
-
-    sameCertRecords.value = certList.slice(0, 5)
-    sameEnterpriseRiskRecords.value = enterpriseRiskList.slice(0, 5)
-  } catch (error) {
-    sameCertRecords.value = []
-    sameEnterpriseRiskRecords.value = []
-    contextError.value = error?.message || '上下文记录加载失败，请稍后重试'
+    sameEnterpriseRiskRecords.value = (result.list || [])
+      .filter((item) => !isSameRecord(item, activeRecord.value))
+      .slice(0, 5)
   } finally {
     contextLoading.value = false
+  }
+}
+
+async function loadRevisionLogs() {
+  if (!activeRecord.value?._id) return
+  historyLoading.value = true
+  try {
+    const result = await getRecordRevisionLogs(userStore.user, activeRecord.value._id)
+    revisionLogs.value = result.list || []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function saveEdit() {
+  if (!activeRecord.value?._id) return
+  saving.value = true
+  try {
+    const result = await updateRecord(userStore.user, activeRecord.value._id, { ...editForm }, editNote.value)
+    activeRecord.value = result.record || { ...activeRecord.value, ...editForm }
+    ElMessage.success('记录已修正')
+    activeTab.value = 'detail'
+    emit('saved', activeRecord.value)
+    await loadRevisionLogs()
+  } catch (error) {
+    ElMessage.error(error?.message || '保存修正失败')
+  } finally {
+    saving.value = false
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.detail-hero {
+.detail-hero,
+.context-head,
+.context-item-main,
+.drawer-actions,
+.history-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.detail-hero {
   margin-bottom: 18px;
 
   h3 {
@@ -277,21 +335,23 @@ async function loadContextRecords() {
   }
 }
 
+.edit-form {
+  :deep(.el-select),
+  :deep(.el-date-editor) {
+    width: 100%;
+  }
+}
+
 .context-section {
   margin-top: 22px;
 }
 
 .context-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
   margin-bottom: 14px;
 
   h4 {
     color: var(--text-main);
     font-size: 16px;
-    font-weight: 700;
   }
 
   p {
@@ -302,69 +362,56 @@ async function loadContextRecords() {
   }
 }
 
-.context-alert {
-  margin-top: 10px;
-}
-
 .context-shell {
   min-height: 120px;
 }
 
-.context-list {
+.context-list,
+.history-list {
   display: grid;
   gap: 10px;
 }
 
-.context-item {
+.context-item,
+.history-card {
   border: 0;
   width: 100%;
   text-align: left;
   border-radius: 18px;
   background: rgba(248, 250, 252, 0.82);
   padding: 14px 16px;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-float);
-  }
 }
 
-.context-item-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.context-item {
+  cursor: pointer;
+}
 
-  strong {
-    color: var(--text-main);
-    font-size: 15px;
-  }
+.context-item-main strong,
+.history-card strong {
+  color: var(--text-main);
+}
 
-  span {
-    color: var(--text-sub);
-    font-size: 12px;
-  }
+.context-item-meta,
+.history-card p {
+  margin-top: 10px;
+  color: var(--text-sub);
+  font-size: 13px;
 }
 
 .context-item-meta {
-  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
 
-  span {
-    font-size: 12px;
-    color: var(--text-sub);
-  }
+.history-head span {
+  color: var(--text-sub);
+  font-size: 12px;
 }
 
 .drawer-actions {
   margin-top: 20px;
-  display: flex;
   justify-content: flex-end;
-  gap: 12px;
 }
 
 @media (max-width: 768px) {

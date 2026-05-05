@@ -30,6 +30,21 @@
           </div>
         </div>
 
+        <section class="quick-prompt-panel">
+          <button
+            v-for="prompt in quickPrompts"
+            :key="prompt.title"
+            type="button"
+            class="quick-prompt-card"
+            :disabled="asking"
+            @click="sendQuestion(prompt.question)"
+          >
+            <span class="quick-prompt-kicker">{{ prompt.kicker }}</span>
+            <span class="quick-prompt-title">{{ prompt.title }}</span>
+            <span class="quick-prompt-copy">{{ prompt.question }}</span>
+          </button>
+        </section>
+
         <section v-if="taskQueue.length" class="queue-panel">
           <div class="queue-head">
             <div class="queue-head-main">
@@ -166,46 +181,104 @@
             class="message-row"
             :class="message.role"
           >
-            <div class="message-bubble" :class="{ 'process-bubble': message.type === 'process' }">
-              <div class="message-meta">{{ message.role === 'assistant' ? 'AI 管家' : '企业用户' }}</div>
+            <div class="message-avatar" :class="message.role">
+              <svg
+                v-if="message.role === 'assistant'"
+                class="avatar-svg"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="aiAvatarFill" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92" />
+                    <stop offset="100%" stop-color="#c7d2fe" stop-opacity="0.78" />
+                  </linearGradient>
+                </defs>
+                <rect x="8" y="8" width="32" height="32" rx="12" fill="url(#aiAvatarFill)" />
+                <circle cx="19" cy="21" r="2.6" fill="#1e3a8a" />
+                <circle cx="29" cy="21" r="2.6" fill="#1e3a8a" />
+                <path d="M18 29c2.6 2.4 9.4 2.4 12 0" fill="none" stroke="#1e3a8a" stroke-linecap="round" stroke-width="2.4" />
+                <path d="M24 5v7" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="2.4" />
+                <circle cx="24" cy="4.5" r="2.4" fill="#ffffff" />
+              </svg>
+              <svg
+                v-else
+                class="avatar-svg"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="userAvatarFill" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ecfeff" />
+                    <stop offset="100%" stop-color="#bfdbfe" />
+                  </linearGradient>
+                </defs>
+                <circle cx="24" cy="18" r="8" fill="url(#userAvatarFill)" />
+                <path d="M12 40c1.8-7.6 8-11.8 12-11.8S34.2 32.4 36 40" fill="url(#userAvatarFill)" />
+              </svg>
+            </div>
 
-              <template v-if="message.type === 'process'">
-                <div class="process-card">
-                  <div class="process-card-head">
-                    <div>
-                      <div class="process-title">{{ message.title }}</div>
-                      <div class="process-summary">{{ message.summary }}</div>
-                    </div>
-                    <div class="process-percent">{{ message.progress }}%</div>
-                  </div>
+            <div class="message-stack">
+              <div class="message-identity">
+                <span class="message-name">{{ message.role === 'assistant' ? 'AI 管家' : '企业用户' }}</span>
+                <span v-if="message.badgeText" class="message-badge">{{ message.badgeText }}</span>
+              </div>
 
-                  <div class="process-track">
-                    <div class="process-track-bar" :style="{ width: `${message.progress}%` }"></div>
-                  </div>
-
-                  <div class="process-steps">
-                    <div
-                      v-for="step in message.steps"
-                      :key="step.key"
-                      class="process-step"
-                      :class="step.status"
-                    >
-                      <div class="process-step-icon">
-                        <span v-if="step.status === 'done'">✓</span>
-                        <span v-else-if="step.status === 'error'">!</span>
-                        <span v-else-if="step.status === 'active'" class="dot"></span>
-                        <span v-else>{{ step.order }}</span>
+              <div class="message-bubble" :class="{ 'process-bubble': message.type === 'process' }">
+                <template v-if="message.type === 'process'">
+                  <div class="process-card">
+                    <div class="process-card-head">
+                      <div>
+                        <div class="process-title">{{ message.title }}</div>
+                        <div class="process-summary">{{ message.summary }}</div>
                       </div>
-                      <div class="process-step-copy">
-                        <div class="process-step-label">{{ step.label }}</div>
-                        <div v-if="step.detail" class="process-step-detail">{{ step.detail }}</div>
+                      <div class="process-percent">{{ message.progress }}%</div>
+                    </div>
+
+                    <div class="process-track">
+                      <div class="process-track-bar" :style="{ width: `${message.progress}%` }"></div>
+                    </div>
+
+                    <div class="process-steps">
+                      <div
+                        v-for="step in message.steps"
+                        :key="step.key"
+                        class="process-step"
+                        :class="step.status"
+                      >
+                        <div class="process-step-icon">
+                          <span v-if="step.status === 'done'">✓</span>
+                          <span v-else-if="step.status === 'error'">!</span>
+                          <span v-else-if="step.status === 'active'" class="dot"></span>
+                          <span v-else>{{ step.order }}</span>
+                        </div>
+                        <div class="process-step-copy">
+                          <div class="process-step-label">{{ step.label }}</div>
+                          <div v-if="step.detail" class="process-step-detail">{{ step.detail }}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </template>
+                </template>
 
-              <div v-else class="message-text">{{ message.content }}</div>
+                <template v-else-if="message.type === 'typing'">
+                  <div class="typing-card">
+                    <div class="typing-copy">{{ message.summary }}</div>
+                    <div class="typing-dots" aria-hidden="true">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  </div>
+                </template>
+
+                <div v-else class="message-text">{{ message.content }}</div>
+              </div>
+
+              <div class="message-footer">
+                <span>{{ message.timeLabel }}</span>
+                <span v-if="message.statusText">{{ message.statusText }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -233,12 +306,216 @@
           <el-tag type="info" size="large">{{ drafts.length }} 份草稿</el-tag>
         </div>
 
+        <section class="history-panel">
+          <div class="history-head">
+            <div>
+              <h4>历史识别任务</h4>
+              <p>刷新页面后，仍可继续查看处理中任务和已完成结果。</p>
+            </div>
+            <div class="history-tools">
+              <div class="queue-filter-group">
+                <button
+                  v-for="option in historyFilterOptions"
+                  :key="option.value"
+                  type="button"
+                  class="queue-filter-btn"
+                  :class="{ active: historyFilter === option.value }"
+                  @click="historyFilter = option.value"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+              <el-button link type="primary" :loading="historyLoading" @click="refreshRecognitionHistory">
+                刷新
+              </el-button>
+              <el-button
+                v-if="recognitionHistory.some((item) => item.status === 'error')"
+                link
+                type="warning"
+                :loading="historyBatchRetrying"
+                @click="retryAllFailedHistory"
+              >
+                一键重试失败
+              </el-button>
+              <el-button
+                v-if="recognitionHistory.some((item) => item.status === 'done')"
+                link
+                type="danger"
+                :loading="historyClearing"
+                @click="clearCompletedHistory"
+              >
+                清理已完成
+              </el-button>
+            </div>
+          </div>
+
+          <div v-if="filteredRecognitionHistory.length" class="history-list">
+            <div
+              v-for="item in filteredRecognitionHistory"
+              :key="item.jobId"
+              class="history-card"
+              :class="item.status"
+            >
+              <div class="history-card-main">
+                <div class="history-card-head">
+                  <div class="history-name">{{ item.name }}</div>
+                  <el-tag size="small" :type="getTaskStatusMeta(item.status === 'processing' ? 'active' : item.status).tagType">
+                    {{ item.statusLabel }}
+                  </el-tag>
+                </div>
+                <div class="history-meta">
+                  <span>{{ item.fileTypeLabel }}</span>
+                  <span>{{ item.timeLabel }}</span>
+                  <span>第 {{ item.attempts || 0 }} 次尝试</span>
+                </div>
+                <div class="history-summary">{{ item.summary || '暂无状态说明' }}</div>
+              </div>
+              <div class="history-actions">
+                <el-button
+                  link
+                  type="danger"
+                  :loading="historyDeletingId === item.jobId"
+                  @click="removeHistoryTask(item)"
+                >
+                  删除
+                </el-button>
+                <el-button
+                  v-if="item.status === 'error'"
+                  link
+                  type="warning"
+                  :loading="historyRetryingId === item.jobId"
+                  @click="retryHistoryTask(item, 'full')"
+                >
+                  整任务重跑
+                </el-button>
+                <el-button
+                  v-if="item.status === 'error'"
+                  link
+                  type="primary"
+                  :disabled="!item.imageStored"
+                  :loading="historyRetryingId === item.jobId"
+                  @click="retryHistoryTask(item, 'ocr')"
+                >
+                  重新 OCR
+                </el-button>
+                <el-button
+                  v-if="item.status === 'error'"
+                  link
+                  type="success"
+                  :loading="historyRetryingId === item.jobId"
+                  @click="retryHistoryTask(item, 'parse')"
+                >
+                  重新解析
+                </el-button>
+                <el-button
+                  v-else-if="item.status === 'done'"
+                  link
+                  type="primary"
+                  @click="restoreDraftFromHistory(item)"
+                >
+                  恢复草稿
+                </el-button>
+                <el-button
+                  v-else-if="item.status === 'processing' || item.status === 'queued'"
+                  link
+                  type="primary"
+                  @click="resumeHistoryTask(item)"
+                >
+                  继续跟踪
+                </el-button>
+                <el-button link type="info" @click="openHistoryDetail(item)">
+                  详情
+                </el-button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="history-empty">
+            还没有历史识别任务。
+          </div>
+        </section>
+
+        <el-drawer v-model="historyDetailVisible" title="任务详情" size="560px" append-to-body>
+          <template v-if="selectedHistoryTask">
+            <section class="job-detail-hero">
+              <div>
+                <h4>{{ selectedHistoryTask.name }}</h4>
+                <p>{{ selectedHistoryTask.fileTypeLabel }} · {{ selectedHistoryTask.timeLabel }}</p>
+              </div>
+              <el-tag :type="getTaskStatusMeta(selectedHistoryTask.status === 'processing' ? 'active' : selectedHistoryTask.status).tagType">
+                {{ selectedHistoryTask.statusLabel }}
+              </el-tag>
+            </section>
+
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="失败原因">
+                {{ selectedHistoryTask.error || selectedHistoryTask.summary || '暂无' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="耗时">
+                {{ formatDuration(selectedHistoryTask.durationMs) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="尝试次数">
+                {{ selectedHistoryTask.attempts || 0 }}
+              </el-descriptions-item>
+              <el-descriptions-item label="阶段">
+                {{ selectedHistoryTask.stage || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="文件缓存">
+                {{ selectedHistoryTask.imageStored ? '保留原图，可重新 OCR' : '已瘦身存储，仅保留 OCR 文本/解析结果' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="处理文件大小">
+                {{ formatFileSize(selectedHistoryTask.sourceSize) }}
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <h4 class="job-section-title">OCR 原文</h4>
+            <pre class="job-raw-text">{{ selectedHistoryOcrText || '暂无 OCR 原文' }}</pre>
+
+            <h4 class="job-section-title">AI 解析结果</h4>
+            <pre class="job-raw-text">{{ selectedHistoryAiJson }}</pre>
+
+            <div v-if="selectedHistoryTask.status === 'error'" class="job-detail-actions">
+              <el-button
+                type="primary"
+                :disabled="!selectedHistoryTask.imageStored"
+                :loading="historyRetryingId === selectedHistoryTask.jobId"
+                @click="retryHistoryTask(selectedHistoryTask, 'ocr')"
+              >
+                重新 OCR
+              </el-button>
+              <el-button type="success" :loading="historyRetryingId === selectedHistoryTask.jobId" @click="retryHistoryTask(selectedHistoryTask, 'parse')">重新解析字段</el-button>
+              <el-button type="warning" :loading="historyRetryingId === selectedHistoryTask.jobId" @click="retryHistoryTask(selectedHistoryTask, 'full')">整任务重跑</el-button>
+            </div>
+          </template>
+        </el-drawer>
+
         <div v-if="!drafts.length" class="empty-state">
           还没有识别结果，请先上传 PDF 或图片。
         </div>
 
-        <div v-else class="draft-list">
-          <section v-for="draft in drafts" :key="draft.id" class="draft-card">
+        <section v-if="drafts.length && draftConflictItems.length && !hideConflictDesk" class="conflict-desk">
+          <div class="conflict-head">
+            <div>
+              <h4>批量导入冲突处理台</h4>
+              <p>先集中处理重复证书、重复出厂编号、缺字段和日期异常，减少逐条保存返工。</p>
+            </div>
+            <div class="conflict-actions">
+              <el-tag type="warning">{{ draftConflictItems.length }} 个问题</el-tag>
+              <el-button link type="info" @click="hideConflictDesk = true">本轮先忽略</el-button>
+            </div>
+          </div>
+          <div class="conflict-list">
+            <div v-for="item in draftConflictItems" :key="item.key" class="conflict-item">
+              <el-tag :type="item.level === 'danger' ? 'danger' : 'warning'" size="small">
+                {{ item.type }}
+              </el-tag>
+              <span>{{ item.message }}</span>
+              <el-button link type="primary" @click="scrollDraftIntoView(item.draftId)">定位草稿</el-button>
+            </div>
+          </div>
+        </section>
+
+        <div v-if="drafts.length" class="draft-list">
+          <section v-for="draft in drafts" :key="draft.id" class="draft-card" :data-draft-id="draft.id">
             <div class="draft-card-head">
               <div>
                 <h4>{{ draft.name }}</h4>
@@ -252,6 +529,12 @@
                   }}
                   · {{ draft.statusText }}
                 </p>
+                <div class="confidence-summary">
+                  <span>字段置信度：</span>
+                  <el-tag size="small" type="success">{{ countConfidence(draft, 'high') }} 高</el-tag>
+                  <el-tag size="small" type="warning">{{ countConfidence(draft, 'medium') }} 中</el-tag>
+                  <el-tag size="small" type="danger">{{ countConfidence(draft, 'low') }} 低</el-tag>
+                </div>
               </div>
               <div class="draft-card-actions">
                 <el-tag :type="draft.saved ? 'success' : 'warning'">
@@ -268,26 +551,32 @@
               <div class="draft-form">
                 <el-form label-position="top">
                   <div class="form-grid">
-                    <el-form-item label="证书编号">
+                    <el-form-item label="证书编号" :class="confidenceClass(draft, 'certNo')">
                       <el-input v-model="draft.extractedData.certNo" />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'certNo') }}</span>
                     </el-form-item>
-                    <el-form-item label="出厂编号">
+                    <el-form-item label="出厂编号" :class="confidenceClass(draft, 'factoryNo')">
                       <el-input v-model="draft.extractedData.factoryNo" />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'factoryNo') }}</span>
                     </el-form-item>
-                    <el-form-item label="送检单位">
+                    <el-form-item label="送检单位" :class="confidenceClass(draft, 'sendUnit')">
                       <el-input v-model="draft.extractedData.sendUnit" />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'sendUnit') }}</span>
                     </el-form-item>
-                    <el-form-item label="仪表名称">
+                    <el-form-item label="仪表名称" :class="confidenceClass(draft, 'instrumentName')">
                       <el-input v-model="draft.extractedData.instrumentName" />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'instrumentName') }}</span>
                     </el-form-item>
-                    <el-form-item label="型号规格">
+                    <el-form-item label="型号规格" :class="confidenceClass(draft, 'modelSpec')">
                       <el-input
                         v-model="draft.extractedData.modelSpec"
                         placeholder="例如：(0-1.6)MPa"
                       />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'modelSpec') }}</span>
                     </el-form-item>
-                    <el-form-item label="制造单位">
+                    <el-form-item label="制造单位" :class="confidenceClass(draft, 'manufacturer')">
                       <el-input v-model="draft.extractedData.manufacturer" />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'manufacturer') }}</span>
                     </el-form-item>
                     <el-form-item label="检定依据">
                       <el-input v-model="draft.extractedData.verificationStd" />
@@ -298,11 +587,12 @@
                         <el-option label="不合格" value="不合格" />
                       </el-select>
                     </el-form-item>
-                    <el-form-item label="检定日期">
+                    <el-form-item label="检定日期" :class="confidenceClass(draft, 'verificationDate')">
                       <el-input
                         v-model="draft.extractedData.verificationDate"
                         placeholder="YYYY-MM-DD"
                       />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'verificationDate') }}</span>
                     </el-form-item>
                     <el-form-item label="压力表状态">
                       <el-select v-model="draft.extractedData.gaugeStatus" placeholder="请选择状态">
@@ -311,11 +601,12 @@
                         <el-option label="报废" value="报废" />
                       </el-select>
                     </el-form-item>
-                    <el-form-item label="安装位置">
+                    <el-form-item label="安装位置" :class="confidenceClass(draft, 'installLocation')">
                       <el-input
                         v-model="draft.extractedData.installLocation"
                         placeholder="请填写该压力表的安装位置"
                       />
+                      <span class="confidence-badge">{{ confidenceLabel(draft, 'installLocation') }}</span>
                     </el-form-item>
                     <el-form-item class="equipment-item" label="所属设备">
                       <el-select
@@ -335,6 +626,26 @@
                       <el-button link type="primary" @click="goToEquipments">
                         没有想要的设备，去新增
                       </el-button>
+                    </el-form-item>
+                    <el-form-item class="equipment-item" label="安装位置/现场照片">
+                      <div class="site-photo-box">
+                        <img
+                          v-if="draft.installPhotoPreviewUrl"
+                          :src="draft.installPhotoPreviewUrl"
+                          alt="现场照片"
+                        />
+                        <div v-else class="site-photo-empty">未上传现场照片</div>
+                        <el-upload
+                          :auto-upload="false"
+                          :show-file-list="false"
+                          accept="image/*"
+                          :on-change="(file) => handleInstallPhotoChange(file, draft)"
+                        >
+                          <el-button size="small" type="primary" plain>
+                            {{ draft.installPhotoFileID ? '更换现场照片' : '上传现场照片' }}
+                          </el-button>
+                        </el-upload>
+                      </div>
                     </el-form-item>
                   </div>
                 </el-form>
@@ -368,25 +679,42 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { callAiFunction, callOcrFunction } from '@/api/cloud'
-import { getEnterpriseEquipments, parseEnterpriseExcel, saveEnterpriseAiRecord } from '@/api/regulator'
+import {
+  getEnterpriseEquipments,
+  parseEnterpriseExcel,
+  saveEnterpriseAiRecord,
+  submitEnterpriseRecognitionTask,
+  getEnterpriseRecognitionTask,
+  listEnterpriseRecognitionTasks,
+  deleteEnterpriseRecognitionTask,
+  clearCompletedRecognitionTasks,
+  retryEnterpriseRecognitionTask,
+  batchRetryEnterpriseRecognitionTasks,
+  getEnterpriseRecords
+} from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 import EnterpriseAiProcessorWorker from '@/workers/enterpriseAiProcessor.worker.js?worker'
 
-const MAX_CONCURRENT_TASKS = 2
+const MAX_CONCURRENT_TASKS = 3
 const UPLOAD_BATCH_SIZE = 6
+const BACKGROUND_POLL_INTERVAL_MS = 1500
 const MAX_OCR_CONCURRENCY = 2
 const OCR_RETRY_LIMIT = 2
 const OCR_TIMEOUT_MS = 25000
 const MAX_AI_PARSE_CONCURRENCY = 2
 const AI_PARSE_TIMEOUT_MS = 60000
+const PDF_TEXT_ONLY_MIN_LENGTH = 80
 const EXCEL_EXT_PATTERN = /\.(xlsx|csv)$/i
 
 const userStore = useUserStore()
 const router = useRouter()
 const pendingUploadBatches = []
-let queueDrainPromise = null
+const aiParseCache = new Map()
+const aiParsePending = new Map()
+const notifiedRecognitionJobs = new Set()
+let isDrainingUploadBatches = false
 
 const fileInputRef = ref(null)
 const messageListRef = ref(null)
@@ -398,18 +726,89 @@ const equipments = ref([])
 const taskQueue = ref([])
 const queueFilter = ref('all')
 const showCompleted = ref(false)
-const messages = ref([
+const recognitionHistory = ref([])
+const historyFilter = ref('all')
+const historyLoading = ref(false)
+const historyDeletingId = ref('')
+const historyClearing = ref(false)
+const historyRetryingId = ref('')
+const historyBatchRetrying = ref(false)
+const historyDetailVisible = ref(false)
+const selectedHistoryTask = ref(null)
+const hideConflictDesk = ref(false)
+const quickPrompts = [
   {
-    id: `msg_${Date.now()}`,
-    role: 'assistant',
-    type: 'text',
-    content: '请输入问题，或直接上传 PDF、多张图片或 Excel 表格。我会先提取检定表内容，再生成可编辑的压力表存档草稿。支持一次多选，系统会自动分批处理。'
+    kicker: '风险扫描',
+    title: '检查这批台账风险',
+    question: '帮我检查这批台账里已过期和 30 天内到期的压力表风险，并给我一个处理建议。'
+  },
+  {
+    kicker: '上传协助',
+    title: '帮我整理上传文件',
+    question: '我准备上传一批 PDF、图片和 Excel 表格，请先告诉我怎么上传更高效、怎么减少识别错误。'
+  },
+  {
+    kicker: '到期提醒',
+    title: '看看 30 天内到期压力表',
+    question: '帮我看看企业里 30 天内到期的压力表应该优先处理哪些，并按风险高低给我排序。'
   }
+]
+
+function formatMessageTime(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value)
+  return date.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function formatDuration(value) {
+  const ms = Number(value || 0)
+  if (!ms) return '暂无'
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
+function formatFileSize(value) {
+  const bytes = Number(value || 0)
+  if (!bytes) return '暂无'
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`
+  return `${(bytes / 1024 / 1024).toFixed(2)}MB`
+}
+
+function buildMessage(role, type = 'text', extra = {}) {
+  return {
+    id: extra.id || `msg_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+    role,
+    type,
+    content: extra.content || '',
+    title: extra.title || '',
+    summary: extra.summary || '',
+    progress: extra.progress || 0,
+    steps: extra.steps || [],
+    timeLabel: extra.timeLabel || formatMessageTime(),
+    statusText: extra.statusText || (role === 'user' ? '已发送' : ''),
+    badgeText: extra.badgeText || (role === 'assistant' ? '在线' : '')
+  }
+}
+
+const messages = ref([
+  buildMessage('assistant', 'text', {
+    content: '你好，我是你的 AI 管家。你可以直接把问题发给我，也可以一次上传 PDF、多张图片或 Excel 表格。我会帮你提取检定信息、整理字段，并生成可以直接保存的压力表台账草稿。',
+    statusText: '欢迎使用'
+  })
 ])
 
 const queueFilterOptions = [
   { label: '全部', value: 'all' },
   { label: '进行中', value: 'active' },
+  { label: '失败', value: 'error' },
+  { label: '已完成', value: 'done' }
+]
+const historyFilterOptions = [
+  { label: '全部', value: 'all' },
+  { label: '处理中', value: 'processing' },
   { label: '失败', value: 'error' },
   { label: '已完成', value: 'done' }
 ]
@@ -446,6 +845,130 @@ const queueSummary = computed(() => {
   return `已完成 ${done} / ${total}，进行中 ${running}，排队 ${pending}，失败 ${failed}`
 })
 
+const filteredRecognitionHistory = computed(() => {
+  if (historyFilter.value === 'all') return recognitionHistory.value
+  return recognitionHistory.value.filter((item) => item.status === historyFilter.value)
+})
+
+const selectedHistoryOcrText = computed(() => {
+  const job = selectedHistoryTask.value
+  return String(job?.result?.ocrText || job?.ocrText || '').trim()
+})
+
+const selectedHistoryAiJson = computed(() => {
+  const data = selectedHistoryTask.value?.result?.extractedData || null
+  return data ? JSON.stringify(data, null, 2) : '暂无 AI 解析结果'
+})
+
+const draftConflictItems = computed(() => {
+  const issues = []
+  const certMap = new Map()
+  const factoryMap = new Map()
+
+  drafts.value.forEach((draft) => {
+    const data = draft.extractedData || {}
+    const certNo = String(data.certNo || '').trim()
+    const factoryNo = String(data.factoryNo || '').trim()
+
+    if (certNo) {
+      certMap.set(certNo, [...(certMap.get(certNo) || []), draft])
+    } else {
+      issues.push(buildDraftIssue(draft, '缺字段', '缺少证书编号', 'warning'))
+    }
+
+    if (factoryNo) {
+      factoryMap.set(factoryNo, [...(factoryMap.get(factoryNo) || []), draft])
+    } else {
+      issues.push(buildDraftIssue(draft, '缺字段', '缺少出厂编号', 'warning'))
+    }
+
+    if (!String(data.instrumentName || '').trim()) {
+      issues.push(buildDraftIssue(draft, '缺字段', '缺少仪表名称', 'warning'))
+    }
+    if (!String(data.installLocation || '').trim()) {
+      issues.push(buildDraftIssue(draft, '缺字段', '缺少安装位置', 'danger'))
+    }
+    if (!draft.installPhotoFileID) {
+      issues.push(buildDraftIssue(draft, '缺现场照片', '保存前需要上传安装位置/现场照片', 'danger'))
+    }
+    if (!isValidDateText(data.verificationDate)) {
+      issues.push(buildDraftIssue(draft, '日期异常', '检定日期为空或格式不是 YYYY-MM-DD', 'danger'))
+    }
+  })
+
+  certMap.forEach((items, certNo) => {
+    if (items.length > 1) {
+      items.forEach((draft) => issues.push(buildDraftIssue(draft, '重复证书', `证书编号 ${certNo} 在本批次重复`, 'danger')))
+    }
+  })
+  factoryMap.forEach((items, factoryNo) => {
+    if (items.length > 1) {
+      items.forEach((draft) => issues.push(buildDraftIssue(draft, '重复出厂编号', `出厂编号 ${factoryNo} 在本批次重复`, 'danger')))
+    }
+  })
+
+  return issues
+})
+
+function buildDraftIssue(draft, type, message, level = 'warning') {
+  return {
+    key: `${draft.id}_${type}_${message}`,
+    draftId: draft.id,
+    type,
+    message: `${draft.name}：${message}`,
+    level
+  }
+}
+
+function isValidDateText(value) {
+  const text = String(value || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false
+  const date = new Date(`${text}T00:00:00`)
+  return !Number.isNaN(date.getTime())
+}
+
+const CONFIDENCE_FIELDS = [
+  'certNo',
+  'factoryNo',
+  'sendUnit',
+  'instrumentName',
+  'modelSpec',
+  'manufacturer',
+  'verificationDate',
+  'installLocation'
+]
+
+function inferFieldConfidence(draft, field) {
+  const value = String(draft?.extractedData?.[field] || '').trim()
+  const rawText = String(draft?.ocrText || '')
+  if (!value) return 'low'
+  if (field === 'verificationDate') return isValidDateText(value) ? 'high' : 'low'
+  if (['certNo', 'factoryNo'].includes(field) && value.length < 5) return 'low'
+  if (field === 'installLocation') return value.length >= 3 ? 'medium' : 'low'
+  if (rawText && rawText.includes(value)) return 'high'
+  if (value.length >= 4) return 'medium'
+  return 'low'
+}
+
+function getFieldConfidence(draft, field) {
+  draft.fieldConfidence ||= {}
+  const current = draft.fieldConfidence[field]
+  return current || inferFieldConfidence(draft, field)
+}
+
+function confidenceLabel(draft, field) {
+  const level = getFieldConfidence(draft, field)
+  return level === 'high' ? '高置信度' : level === 'medium' ? '中置信度' : '低置信度，建议核对'
+}
+
+function confidenceClass(draft, field) {
+  return `confidence-${getFieldConfidence(draft, field)}`
+}
+
+function countConfidence(draft, level) {
+  return CONFIDENCE_FIELDS.filter((field) => getFieldConfidence(draft, field) === level).length
+}
+
 function scrollMessagesToBottom() {
   nextTick(() => {
     const container = messageListRef.value
@@ -455,13 +978,64 @@ function scrollMessagesToBottom() {
   })
 }
 
-function addMessage(role, content) {
-  messages.value.push({
-    id: `msg_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
-    role,
-    type: 'text',
+function addMessage(role, content, extra = {}) {
+  messages.value.push(buildMessage(role, 'text', {
+    ...extra,
     content
+  }))
+  scrollMessagesToBottom()
+}
+
+function updateLatestUserMessageStatus(statusText = '已读') {
+  const latestUserMessage = [...messages.value].reverse().find((item) => item.role === 'user')
+  if (latestUserMessage) {
+    latestUserMessage.statusText = statusText
+  }
+}
+
+function createTypingMessage(summary = '正在思考你的问题…') {
+  const message = buildMessage('assistant', 'typing', {
+    summary,
+    statusText: '思考中'
   })
+  messages.value.push(message)
+  scrollMessagesToBottom()
+  return message
+}
+
+function removeMessageById(messageId) {
+  messages.value = messages.value.filter((item) => item.id !== messageId)
+}
+
+async function streamAssistantMessage(content, extra = {}) {
+  const fullText = String(content || '').trim() || '未获得 AI 回复。'
+  const message = buildMessage('assistant', 'text', {
+    ...extra,
+    content: '',
+    statusText: '回复中'
+  })
+  messages.value.push(message)
+  scrollMessagesToBottom()
+
+  const segments = fullText
+    .split(/(?<=[。！？；\n])/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  if (!segments.length) {
+    message.content = fullText
+    message.statusText = '已送达'
+    scrollMessagesToBottom()
+    return
+  }
+
+  for (const segment of segments) {
+    message.content += `${message.content ? '\n' : ''}${segment}`
+    scrollMessagesToBottom()
+    await sleep(Math.min(320, Math.max(120, segment.length * 18)))
+  }
+
+  message.statusText = '已送达'
   scrollMessagesToBottom()
 }
 
@@ -565,12 +1139,14 @@ function createTask(title, stepLabels, meta = {}) {
     statusTagType: statusMeta.tagType,
     expanded: true,
     retrying: false,
-    attempts: meta.attempts || 1,
-    lastError: '',
-    runner: null,
-    messageId: '',
-    steps: stepLabels.map((label, index) => ({
-      key: `${index}_${label}`,
+      attempts: meta.attempts || 1,
+      lastError: '',
+      runner: null,
+      serverJobId: '',
+      monitorToken: '',
+      messageId: '',
+      steps: stepLabels.map((label, index) => ({
+        key: `${index}_${label}`,
       order: index + 1,
       label,
       detail: '',
@@ -581,16 +1157,25 @@ function createTask(title, stepLabels, meta = {}) {
   return task
 }
 
+function getTaskStepLabels(fileType = 'image') {
+  return [
+    '上传文件',
+    fileType === 'excel' ? '读取表格' : fileType === 'pdf' ? '渲染页面' : '压缩图片',
+    fileType === 'excel' ? '整理字段' : '提取文本',
+    '解析字段',
+    '生成草稿'
+  ]
+}
+
 function createProcessMessage(task) {
-  const message = {
+  const message = buildMessage('assistant', 'process', {
     id: `process_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
-    role: 'assistant',
-    type: 'process',
     title: task.name,
     summary: task.summary,
     progress: task.progress,
-    steps: task.steps.map((step) => ({ ...step }))
-  }
+    steps: task.steps.map((step) => ({ ...step })),
+    statusText: '处理中'
+  })
   task.messageId = message.id
   messages.value.push(message)
   scrollMessagesToBottom()
@@ -605,6 +1190,7 @@ function syncTaskToProcess(task, message) {
   message.summary = task.summary
   message.progress = task.progress
   message.steps = task.steps.map((step) => ({ ...step }))
+  message.statusText = task.status === 'done' ? '已完成' : task.status === 'error' ? '失败' : '处理中'
   scrollMessagesToBottom()
 }
 
@@ -687,6 +1273,219 @@ function toggleTaskExpanded(task) {
 
 function clearCompletedTasks() {
   taskQueue.value = taskQueue.value.filter((item) => item.status !== 'done')
+}
+
+function findDraftByJobId(jobId) {
+  return drafts.value.find((item) => item.jobId === jobId) || null
+}
+
+function buildDraftFromRecognitionJob(job, meta = {}) {
+  const existing = findDraftByJobId(job.jobId)
+  if (existing) return existing
+
+  const draft = createDraftEntry({
+    name: meta.name || job.name || '识别草稿',
+    fileType: meta.fileType || job.fileType || 'image',
+    previewUrl: meta.previewUrl || '',
+    fileID: '',
+    ocrText: String(job.result?.ocrText || '').trim(),
+    extractedData: repairExtractedData(job.result?.extractedData || {}, job.result?.ocrText || '')
+  })
+  draft.jobId = job.jobId
+  drafts.value.unshift(draft)
+  autoAssignDraftEquipment(draft)
+  return draft
+}
+
+function normalizeHistoryItem(job) {
+  const fileType = String(job.fileType || 'image')
+  return {
+    ...job,
+    status: String(job.status || 'queued'),
+    statusLabel:
+      job.status === 'processing'
+        ? '处理中'
+        : job.status === 'queued'
+          ? '排队中'
+          : job.status === 'done'
+            ? '已完成'
+            : job.status === 'error'
+              ? '失败'
+              : '未知',
+    fileTypeLabel:
+      fileType === 'pdf'
+        ? 'PDF 页面'
+        : fileType === 'excel'
+          ? '表格导入'
+          : '图片识别',
+    timeLabel: formatMessageTime(Number(job.updatedAt || job.createdAt || Date.now()))
+  }
+}
+
+function openHistoryDetail(item) {
+  selectedHistoryTask.value = item
+  historyDetailVisible.value = true
+}
+
+async function refreshRecognitionHistory() {
+  historyLoading.value = true
+  try {
+    const before = new Map(recognitionHistory.value.map((item) => [item.jobId, item.status]))
+    const result = await listEnterpriseRecognitionTasks(userStore.user, 24)
+    const nextList = (Array.isArray(result.list) ? result.list : []).map(normalizeHistoryItem)
+    recognitionHistory.value = nextList
+    notifyRecognitionChanges(nextList, before)
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function notifyRecognitionChanges(nextList, before) {
+  const completed = nextList.filter((item) => {
+    const previous = before.get(item.jobId)
+    return ['done', 'error'].includes(item.status) && previous && previous !== item.status && !notifiedRecognitionJobs.has(item.jobId)
+  })
+  if (!completed.length) return
+
+  completed.forEach((item) => notifiedRecognitionJobs.add(item.jobId))
+  const done = completed.filter((item) => item.status === 'done').length
+  const failed = completed.filter((item) => item.status === 'error').length
+  const message = `后台识别完成：${done} 个成功，${failed} 个失败`
+  ElMessage.info(message)
+
+  if ('Notification' in window) {
+    if (Notification.permission === 'granted') {
+      new Notification('压力表识别任务', { body: message })
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          new Notification('压力表识别任务', { body: message })
+        }
+      })
+    }
+  }
+}
+
+function resumeHistoryTask(item) {
+  const existing = taskQueue.value.find((task) => task.serverJobId === item.jobId)
+  if (existing) {
+    existing.expanded = true
+    return
+  }
+
+  const { task, processMessage } = buildTaskFromServerJob(item)
+  task.monitorToken = `resume_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+  void monitorRecognitionTask(task, processMessage, task.monitorToken, {
+    name: item.name,
+    fileType: item.fileType,
+    previewUrl: ''
+  })
+}
+
+function restoreDraftFromHistory(item) {
+  const draft = buildDraftFromRecognitionJob(item, {
+    name: item.name,
+    fileType: item.fileType,
+    previewUrl: ''
+  })
+  draft.showRawText = true
+  ElMessage.success(`已恢复 ${draft.name} 的草稿`)
+}
+
+async function retryHistoryTask(item, mode = 'full') {
+  historyRetryingId.value = item.jobId
+  try {
+    const job = await retryEnterpriseRecognitionTask(userStore.user, item.jobId, mode)
+    await refreshRecognitionHistory()
+
+    const existing = taskQueue.value.find((task) => task.serverJobId === item.jobId)
+    if (existing) {
+      existing.monitorToken = `retry_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+      existing.expanded = true
+      const processMessage = getTaskProcessMessage(existing)
+      resetTaskForRetry(existing, processMessage)
+      syncTaskToProcess(existing, processMessage)
+      void monitorRecognitionTask(existing, processMessage, existing.monitorToken, {
+        name: existing.name,
+        fileType: existing.fileType,
+        previewUrl: existing.previewUrl || ''
+      })
+      ElMessage.success(job.summary || '识别任务已重新加入后台队列')
+      return
+    }
+
+    resumeHistoryTask(normalizeHistoryItem(job))
+    if (selectedHistoryTask.value?.jobId === item.jobId) {
+      selectedHistoryTask.value = normalizeHistoryItem(job)
+    }
+    ElMessage.success(job.summary || '识别任务已重新加入后台队列')
+  } finally {
+    historyRetryingId.value = ''
+  }
+}
+
+async function retryAllFailedHistory() {
+  const failedIds = recognitionHistory.value
+    .filter((item) => item.status === 'error')
+    .map((item) => item.jobId)
+  if (!failedIds.length) return
+
+  historyBatchRetrying.value = true
+  try {
+    const result = await batchRetryEnterpriseRecognitionTasks(userStore.user, failedIds, 'full')
+    await refreshRecognitionHistory()
+    recognitionHistory.value
+      .filter((item) => failedIds.includes(item.jobId))
+      .forEach((item) => resumeHistoryTask(item))
+    ElMessage.success(`已重试 ${result.successCount || 0} 个失败任务`)
+  } catch (error) {
+    ElMessage.error(error?.message || '批量重试失败')
+  } finally {
+    historyBatchRetrying.value = false
+  }
+}
+
+async function removeHistoryTask(item) {
+  historyDeletingId.value = item.jobId
+  try {
+    await deleteEnterpriseRecognitionTask(userStore.user, item.jobId)
+    recognitionHistory.value = recognitionHistory.value.filter((history) => history.jobId !== item.jobId)
+    taskQueue.value = taskQueue.value.filter((task) => {
+      if (task.serverJobId === item.jobId) {
+        task.monitorToken = ''
+        return false
+      }
+      return true
+    })
+    drafts.value = drafts.value.filter((draft) => draft.jobId !== item.jobId)
+    ElMessage.success('历史任务已删除')
+  } finally {
+    historyDeletingId.value = ''
+  }
+}
+
+async function clearCompletedHistory() {
+  historyClearing.value = true
+  try {
+    const result = await clearCompletedRecognitionTasks(userStore.user)
+    const doneIds = new Set(
+      recognitionHistory.value
+        .filter((item) => item.status === 'done')
+        .map((item) => item.jobId)
+    )
+    recognitionHistory.value = recognitionHistory.value.filter((item) => item.status !== 'done')
+    taskQueue.value = taskQueue.value.filter((task) => {
+      if (doneIds.has(task.serverJobId)) {
+        task.monitorToken = ''
+        return false
+      }
+      return true
+    })
+    drafts.value = drafts.value.filter((draft) => !doneIds.has(draft.jobId))
+    ElMessage.success(`已清理 ${Number(result.count || 0)} 个已完成任务`)
+  } finally {
+    historyClearing.value = false
+  }
 }
 
 function resetTaskForRetry(task, processMessage) {
@@ -826,30 +1625,22 @@ function runProcessorWorker(type, payload) {
 }
 
 async function processImageInWorker(file) {
-  const baseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim()
   return limitOcrProcessing(async () => {
-    const result = await runProcessorWorker('process-image', {
+    return runProcessorWorker('process-image', {
       file,
-      baseUrl,
-      token: getServerToken(),
+      baseUrl: '',
+      token: '',
       compressOptions: {
-        maxWidth: 1600,
-        maxHeight: 1600,
-        quality: 0.8,
-        passThroughMaxBytes: 1.2 * 1024 * 1024
+        maxWidth: 1400,
+        maxHeight: 1400,
+        quality: 0.74,
+        passThroughMaxBytes: 900 * 1024
       },
       ocrOptions: {
         retryLimit: OCR_RETRY_LIMIT,
         timeout: OCR_TIMEOUT_MS
       }
     })
-
-    if (!baseUrl && !result.ocrText && result.imageBase64) {
-      const ocrRes = await callOcrWithRetry({ imageBase64: result.imageBase64 })
-      result.ocrText = String(ocrRes.text || '').trim()
-    }
-
-    return result
   })
 }
 
@@ -857,8 +1648,8 @@ async function processPdfFirstPageInWorker(file) {
   const result = await runProcessorWorker('process-pdf-first-page', {
     file,
     pdfOptions: {
-      scale: 1.8,
-      quality: 0.92
+      scale: 1.2,
+      quality: 0.76
     }
   })
 
@@ -869,15 +1660,20 @@ async function processPdfFirstPageInWorker(file) {
 
   const pageName = String(result.pageName || `${file.name.replace(/\.pdf$/i, '')} 第 1 页`)
   const previewUrl = URL.createObjectURL(pageBlob)
-  const imageFile = new File([pageBlob], `${file.name.replace(/\.pdf$/i, '')}_page_1.png`, {
-    type: 'image/png',
+  const imageFile = new File([pageBlob], `${file.name.replace(/\.pdf$/i, '')}_page_1.jpg`, {
+    type: 'image/jpeg',
     lastModified: Date.now()
   })
+
+  const directText = String(result.pageText || '').trim()
+  const imageBase64 = directText.length >= PDF_TEXT_ONLY_MIN_LENGTH ? '' : await blobToBase64(imageFile)
 
   return {
     file: imageFile,
     previewUrl,
-    directText: String(result.pageText || '').trim(),
+    directText,
+    imageBase64,
+    sourceSize: imageFile.size,
     name: pageName
   }
 }
@@ -943,11 +1739,15 @@ function createDraftEntry({
   fileType = 'image',
   previewUrl = '',
   fileID = '',
+  installPhotoFileID = '',
+  installPhotoPreviewUrl = '',
   ocrText = '',
   extractedData = {},
+  fieldConfidence = {},
   selectedEquipmentId = '',
   selectedEquipmentName = ''
 }) {
+  const repairedData = repairExtractedData(extractedData, ocrText)
   return {
     id: `draft_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
     name: name || '识别草稿',
@@ -955,14 +1755,30 @@ function createDraftEntry({
     statusText: '识别完成',
     previewUrl,
     fileID,
+    installPhotoFileID,
+    installPhotoPreviewUrl,
     ocrText,
-    extractedData: repairExtractedData(extractedData, ocrText),
+    extractedData: repairedData,
+    fieldConfidence: {
+      ...Object.fromEntries(CONFIDENCE_FIELDS.map((field) => [field, inferFieldConfidence({ extractedData: repairedData, ocrText }, field)])),
+      ...fieldConfidence
+    },
     selectedEquipmentId,
     selectedEquipmentName,
     saved: false,
     saving: false,
     showRawText: false
   }
+}
+
+function cloneExtractedData(data = {}) {
+  return JSON.parse(JSON.stringify(data || {}))
+}
+
+function createAiParseCacheKey(sourceText) {
+  return String(sourceText || '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 async function loadEquipments() {
@@ -1055,13 +1871,59 @@ async function callAiWithTimeout(payload, timeout = AI_PARSE_TIMEOUT_MS) {
   }
 }
 
-async function sendQuestion() {
-  const text = question.value.trim()
+async function parseFieldsWithCache(sourceText, task, processMessage) {
+  const cacheKey = createAiParseCacheKey(sourceText)
+
+  if (cacheKey && aiParseCache.has(cacheKey)) {
+    activateTaskStep(task, processMessage, 3, '命中解析缓存，正在回填字段')
+    return cloneExtractedData(aiParseCache.get(cacheKey))
+  }
+
+  if (cacheKey && aiParsePending.has(cacheKey)) {
+    activateTaskStep(task, processMessage, 3, '复用同批解析结果')
+    return cloneExtractedData(await aiParsePending.get(cacheKey))
+  }
+
+  activateTaskStep(task, processMessage, 3, '等待 AI 解析槽位')
+
+  const runner = limitAiParsing(async () => {
+    activateTaskStep(task, processMessage, 3, '正在解析字段')
+    const aiRes = await callAiWithTimeout({
+      action: 'extractRecordFromImage',
+      ocrText: sourceText,
+      userType: 'enterprise',
+      userInfo: userStore.user
+    })
+    return repairExtractedData(aiRes?.data || {}, sourceText)
+  })
+
+  if (cacheKey) {
+    aiParsePending.set(cacheKey, runner)
+  }
+
+  try {
+    const parsed = await runner
+    if (cacheKey) {
+      aiParseCache.set(cacheKey, cloneExtractedData(parsed))
+    }
+    return cloneExtractedData(parsed)
+  } finally {
+    if (cacheKey) {
+      aiParsePending.delete(cacheKey)
+    }
+  }
+}
+
+async function sendQuestion(textOverride = '') {
+  const text = String(textOverride || question.value).trim()
   if (!text || asking.value) return
 
   addMessage('user', text)
-  question.value = ''
+  if (!textOverride) {
+    question.value = ''
+  }
   asking.value = true
+  const typingMessage = createTypingMessage()
 
   try {
     const result = await callAiFunction({
@@ -1070,11 +1932,205 @@ async function sendQuestion() {
       userInfo: userStore.user,
       conversationContext: buildConversationContext()
     })
-    addMessage('assistant', result.answer || '未获得 AI 回复。')
+    updateLatestUserMessageStatus('已读')
+    removeMessageById(typingMessage.id)
+    await streamAssistantMessage(result.answer || '未获得 AI 回复。')
   } catch (error) {
+    updateLatestUserMessageStatus('已读')
+    removeMessageById(typingMessage.id)
     addMessage('assistant', `AI 调用失败：${error.message || '未知错误'}`)
   } finally {
     asking.value = false
+  }
+}
+
+async function monitorRecognitionTask(task, processMessage, monitorToken, meta = {}) {
+  while (task.monitorToken === monitorToken) {
+    const status = await getEnterpriseRecognitionTask(userStore.user, task.serverJobId)
+    task.serverJobId = status.jobId || task.serverJobId
+
+    if (status.status === 'queued') {
+      activateTaskStep(task, processMessage, 2, status.summary || '已进入后台队列')
+    } else if (status.status === 'processing') {
+      if (status.stage === 'ocr') {
+        activateTaskStep(task, processMessage, 2, status.summary || '后台正在识别文本')
+      } else if (status.stage === 'ai') {
+        completeTaskStep(task, processMessage, 2, '文本提取完成')
+        activateTaskStep(task, processMessage, 3, status.summary || '后台正在解析字段')
+      }
+    } else if (status.status === 'done') {
+      completeTaskStep(task, processMessage, 2, '文本提取完成')
+      completeTaskStep(task, processMessage, 3, '字段解析完成')
+      activateTaskStep(task, processMessage, 4, '正在生成可编辑草稿')
+      const previewUrl = meta.previewUrl || task.previewUrl || ''
+      const draft = buildDraftFromRecognitionJob(status, {
+        name: meta.name || task.name,
+        fileType: meta.fileType || 'image',
+        previewUrl
+      })
+      finishTask(task, processMessage, '处理完成，可确认字段后保存')
+      addMessage('assistant', `已完成 ${draft.name} 的识别，请确认字段后保存到共享台账。`)
+      await refreshRecognitionHistory()
+      return
+    } else if (status.status === 'error') {
+      const failedStepIndex = status.stage === 'ai' ? 3 : 2
+      failTaskStep(task, processMessage, failedStepIndex, status.error || status.summary || '后台识别失败')
+      task.expanded = true
+      addMessage('assistant', `${task.name} 处理失败：${status.error || status.summary || '后台识别失败'}`)
+      await refreshRecognitionHistory()
+      return
+    }
+
+    await sleep(BACKGROUND_POLL_INTERVAL_MS)
+  }
+}
+
+async function submitRecognitionTaskInBackground(file, meta = {}) {
+  const task = meta.task || createTask(meta.name || file.name || '识别任务', [
+    '上传文件',
+    meta.fileType === 'pdf' ? '渲染页面' : '压缩图片',
+    '提取文本',
+    '解析字段',
+    '生成草稿'
+  ], {
+    fileType: meta.fileType,
+    previewUrl: meta.previewUrl || ''
+  })
+
+  const processMessage = meta.processMessage || createProcessMessage(task)
+
+  activateTaskStep(task, processMessage, 0, '正在接收文件')
+  task.previewUrl = meta.previewUrl || URL.createObjectURL(file)
+  completeTaskStep(task, processMessage, 0, '文件已接收')
+
+  let workingFile = file
+  let sourceText = String(meta.directText || '').trim()
+  let imageBase64 = String(meta.imageBase64 || '').trim()
+  let imageHash = String(meta.imageHash || '').trim()
+  let sourceSize = Number(meta.sourceSize || file.size || 0)
+
+  activateTaskStep(
+    task,
+    processMessage,
+    1,
+    meta.fileType === 'pdf' ? '正在渲染 PDF 页面' : '正在压缩图片'
+  )
+
+  if (meta.fileType === 'pdf') {
+    completeTaskStep(task, processMessage, 1, 'PDF 页面已渲染')
+  } else {
+    const processed = await processImageInWorker(file)
+    workingFile = processed.compressedFile
+    sourceText = String(processed.ocrText || '').trim()
+    imageBase64 = String(processed.imageBase64 || '').trim()
+    imageHash = String(processed.imageHash || '').trim()
+    sourceSize = Number(processed.sourceSize || workingFile.size || sourceSize)
+    completeTaskStep(task, processMessage, 1, processed.compressReason || '图片压缩完成')
+  }
+
+  if (!imageBase64 && !sourceText) {
+    imageBase64 = await blobToBase64(workingFile)
+    sourceSize = workingFile.size || sourceSize
+  }
+
+  activateTaskStep(
+    task,
+    processMessage,
+    2,
+    sourceText && !imageBase64 ? '已提取 PDF 文本，正在提交后台解析' : '正在提交后台识别任务'
+  )
+  const submitted = await submitEnterpriseRecognitionTask(userStore.user, {
+    name: meta.name || file.name,
+    fileType: meta.fileType || 'image',
+    imageBase64,
+    ocrText: sourceText,
+    imageHash,
+    sourceSize
+  })
+
+  task.serverJobId = submitted.jobId
+  task.monitorToken = `monitor_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+  activateTaskStep(task, processMessage, 2, submitted.summary || '已进入后台队列')
+  await refreshRecognitionHistory()
+
+  void monitorRecognitionTask(task, processMessage, task.monitorToken, {
+    name: meta.name || file.name,
+    fileType: meta.fileType || 'image',
+    previewUrl: task.previewUrl
+  })
+}
+
+function buildTaskFromServerJob(job) {
+  const task = createTask(job.name || '识别任务', getTaskStepLabels(job.fileType || 'image'), {
+    fileType: job.fileType || 'image',
+    initialStatus:
+      job.status === 'processing' ? 'active' : job.status === 'error' ? 'error' : job.status === 'done' ? 'done' : 'pending',
+    attempts: job.attempts || 1
+  })
+
+  task.serverJobId = job.jobId
+  task.progress = Number(job.progress || 0)
+  task.summary = job.summary || '已恢复后台任务'
+  task.status = job.status === 'processing' ? 'active' : job.status
+  const statusMeta = getTaskStatusMeta(task.status)
+  task.statusLabel = statusMeta.label
+  task.statusTagType = statusMeta.tagType
+  task.lastError = job.error || ''
+  task.expanded = task.status !== 'done'
+
+  if (task.steps[0]) task.steps[0].status = 'done'
+  if (job.fileType === 'pdf' || job.fileType === 'image') {
+    if (task.steps[1]) task.steps[1].status = 'done'
+  }
+  if (job.stage === 'queued') {
+    if (task.steps[2]) task.steps[2].status = 'active'
+  } else if (job.stage === 'ocr') {
+    if (task.steps[2]) task.steps[2].status = 'active'
+  } else if (job.stage === 'ai') {
+    if (task.steps[2]) task.steps[2].status = 'done'
+    if (task.steps[3]) task.steps[3].status = 'active'
+  } else if (job.stage === 'done') {
+    task.steps.forEach((step) => {
+      step.status = 'done'
+    })
+  } else if (job.stage === 'error') {
+    const failedIndex = task.steps[3] && (job.summary || '').includes('解析') ? 3 : 2
+    task.steps.forEach((step, index) => {
+      step.status = index < failedIndex ? 'done' : index === failedIndex ? 'error' : 'pending'
+    })
+  }
+
+  const processMessage = createProcessMessage(task)
+  syncTaskToProcess(task, processMessage)
+  return { task, processMessage }
+}
+
+async function restoreRecognitionTasks() {
+  await refreshRecognitionHistory()
+  const jobs = recognitionHistory.value
+
+  for (const job of jobs.reverse()) {
+    if (taskQueue.value.some((item) => item.serverJobId === job.jobId)) continue
+
+    const { task, processMessage } = buildTaskFromServerJob(job)
+    if (job.status === 'done' && job.result) {
+      buildDraftFromRecognitionJob(job, {
+        name: job.name,
+        fileType: job.fileType,
+        previewUrl: task.previewUrl || ''
+      })
+      finishTask(task, processMessage, '已从后台恢复识别结果')
+      continue
+    }
+
+    if (job.status === 'queued' || job.status === 'processing') {
+      task.monitorToken = `restore_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+      void monitorRecognitionTask(task, processMessage, task.monitorToken, {
+        name: job.name,
+        fileType: job.fileType,
+        previewUrl: ''
+      })
+    }
   }
 }
 
@@ -1124,17 +2180,7 @@ async function fileToImageDraft(file, meta = {}) {
   }
   completeTaskStep(task, processMessage, 2, '文本提取完成')
 
-  activateTaskStep(task, processMessage, 3, '等待 AI 解析槽位')
-  const aiRes = await limitAiParsing(async () => {
-    activateTaskStep(task, processMessage, 3, '正在解析字段')
-    return callAiWithTimeout({
-      action: 'extractRecordFromImage',
-      ocrText: sourceText,
-      userType: 'enterprise',
-      userInfo: userStore.user
-    })
-  })
-  const extractedData = repairExtractedData(aiRes?.data || {}, sourceText)
+  const extractedData = await parseFieldsWithCache(sourceText, task, processMessage)
   completeTaskStep(task, processMessage, 3, '字段解析完成')
 
   activateTaskStep(task, processMessage, 4, '正在生成可编辑草稿')
@@ -1234,33 +2280,35 @@ function createTaskEntries(files, batchLabel = '') {
       initialStatus: 'pending'
     })
     const processMessage = createProcessMessage(task)
-    const runner = async () => {
-      if (isExcel) {
-        await fileToExcelDrafts(file, {
-          name: file.name,
-          fileType: 'excel',
+      const runner = async () => {
+        if (isExcel) {
+          await fileToExcelDrafts(file, {
+            name: file.name,
+            fileType: 'excel',
           task,
           processMessage
         })
-      } else if (isPdf) {
-        const firstPage = await processPdfFirstPageInWorker(file)
-        task.previewUrl = firstPage.previewUrl
-        task.name = firstPage.name
-        processMessage.title = firstPage.name
-        await fileToImageDraft(firstPage.file, {
-          name: firstPage.name,
-          fileType: 'pdf',
-          previewUrl: firstPage.previewUrl,
-          directText: firstPage.directText,
-          task,
-          processMessage
-        })
-      } else {
-        await fileToImageDraft(file, {
-          name: file.name,
-          fileType: 'image',
-          task,
-          processMessage
+        } else if (isPdf) {
+          const firstPage = await processPdfFirstPageInWorker(file)
+          task.previewUrl = firstPage.previewUrl
+          task.name = firstPage.name
+          processMessage.title = firstPage.name
+          await submitRecognitionTaskInBackground(firstPage.file, {
+            name: firstPage.name,
+            fileType: 'pdf',
+            previewUrl: firstPage.previewUrl,
+            directText: firstPage.directText,
+            imageBase64: firstPage.imageBase64,
+            sourceSize: firstPage.sourceSize,
+            task,
+            processMessage
+          })
+        } else {
+          await submitRecognitionTaskInBackground(file, {
+            name: file.name,
+            fileType: 'image',
+            task,
+            processMessage
         })
       }
     }
@@ -1275,27 +2323,25 @@ function createTaskEntries(files, batchLabel = '') {
 }
 
 async function drainUploadBatches() {
-  if (queueDrainPromise) return queueDrainPromise
+  if (isDrainingUploadBatches) return
 
-  queueDrainPromise = (async () => {
-    uploading.value = true
-    try {
-      while (pendingUploadBatches.length) {
-        const currentBatch = pendingUploadBatches.shift()
-        addMessage(
-          'assistant',
-          `${currentBatch.label} 开始处理，共 ${currentBatch.entries.length} 个文件。`
-        )
-        await runTaskQueue(currentBatch.entries, MAX_CONCURRENT_TASKS)
-        addMessage('assistant', `${currentBatch.label} 处理完成。`)
-      }
-    } finally {
-      uploading.value = false
-      queueDrainPromise = null
+  isDrainingUploadBatches = true
+  try {
+    while (pendingUploadBatches.length) {
+      const currentBatch = pendingUploadBatches.shift()
+      addMessage(
+        'assistant',
+        `${currentBatch.label} 已转入后台处理，共 ${currentBatch.entries.length} 个文件。你可以继续提问或继续上传其他文件。`
+      )
+      await runTaskQueue(currentBatch.entries, MAX_CONCURRENT_TASKS)
+      addMessage('assistant', `${currentBatch.label} 已全部提交到后台识别。`)
     }
-  })()
-
-  return queueDrainPromise
+  } finally {
+    isDrainingUploadBatches = false
+    if (pendingUploadBatches.length) {
+      void drainUploadBatches()
+    }
+  }
 }
 
 async function handleFileChange(event) {
@@ -1303,12 +2349,13 @@ async function handleFileChange(event) {
   if (!files.length) return
 
   try {
+    uploading.value = true
     const batches = chunkFiles(files, UPLOAD_BATCH_SIZE)
     addMessage(
       'assistant',
       batches.length > 1
-        ? `已加入 ${files.length} 个文件，系统会分成 ${batches.length} 批处理。`
-        : `已加入 ${files.length} 个文件，开始处理。`
+        ? `已加入 ${files.length} 个文件，系统会分成 ${batches.length} 批在后台处理。`
+        : `已加入 ${files.length} 个文件，已转入后台处理。`
     )
 
     batches.forEach((batchFiles, index) => {
@@ -1319,8 +2366,9 @@ async function handleFileChange(event) {
       })
     })
 
-    await drainUploadBatches()
+    void drainUploadBatches()
   } finally {
+    uploading.value = false
     if (fileInputRef.value) {
       fileInputRef.value.value = ''
     }
@@ -1366,6 +2414,54 @@ function toggleRawText(draft) {
   draft.showRawText = !draft.showRawText
 }
 
+function scrollDraftIntoView(draftId) {
+  hideConflictDesk.value = true
+  nextTick(() => {
+    const el = document.querySelector(`[data-draft-id="${draftId}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
+async function handleInstallPhotoChange(uploadFile, draft) {
+  const file = uploadFile?.raw || uploadFile
+  if (!file) return
+  try {
+    const dataUrl = await fileToCompactDataUrl(file, 960, 0.68)
+    draft.installPhotoFileID = dataUrl
+    draft.installPhotoPreviewUrl = dataUrl
+    hideConflictDesk.value = false
+    ElMessage.success('现场照片已压缩并暂存')
+  } catch (error) {
+    ElMessage.error(error.message || '现场照片处理失败')
+  }
+}
+
+function fileToCompactDataUrl(file, maxWidth = 960, quality = 0.68) {
+  return new Promise((resolve, reject) => {
+    if (!file.type?.startsWith('image/')) {
+      reject(new Error('请上传图片格式的现场照片'))
+      return
+    }
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('现场照片读取失败'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('现场照片解析失败'))
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(img.width * scale))
+        canvas.height = Math.max(1, Math.round(img.height * scale))
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = String(reader.result || '')
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 function validateDraft(draft) {
   if (!draft.selectedEquipmentId) {
     throw new Error('请选择所属设备')
@@ -1379,6 +2475,37 @@ function validateDraft(draft) {
   if (!draft.extractedData.installLocation) {
     throw new Error('请填写该压力表的安装位置')
   }
+  if (!draft.installPhotoFileID) {
+    throw new Error('请上传安装位置/现场照片')
+  }
+}
+
+async function checkDuplicateDraftRecord(draft) {
+  const certNo = String(draft.extractedData.certNo || '').trim()
+  const factoryNo = String(draft.extractedData.factoryNo || '').trim()
+  if (!certNo && !factoryNo) return true
+
+  const checks = []
+  if (certNo) checks.push(getEnterpriseRecords(userStore.user, { keyword: certNo }))
+  if (factoryNo) checks.push(getEnterpriseRecords(userStore.user, { keyword: factoryNo }))
+
+  const results = await Promise.all(checks)
+  const duplicates = results
+    .flatMap((result) => result.list || [])
+    .filter((item) => {
+      if (certNo && item.certNo === certNo) return true
+      if (factoryNo && item.factoryNo === factoryNo) return true
+      return false
+    })
+
+  if (!duplicates.length) return true
+
+  await ElMessageBox.confirm(
+    `检测到可能重复的台账记录 ${duplicates.length} 条。重复证书或出厂编号可能会造成台账重复，是否仍然保存？`,
+    '重复记录提醒',
+    { type: 'warning', confirmButtonText: '仍然保存', cancelButtonText: '返回检查' }
+  )
+  return true
 }
 
 async function saveDraft(draft) {
@@ -1394,11 +2521,14 @@ async function saveDraft(draft) {
   draft.saving = true
   try {
     syncSelectedEquipment(draft)
+    await checkDuplicateDraftRecord(draft)
     const result = await saveEnterpriseAiRecord(userStore.user, {
       extractedData: draft.extractedData,
       equipmentId: draft.selectedEquipmentId,
       installLocation: draft.extractedData.installLocation,
-      fileID: draft.fileID
+      fileID: draft.fileID,
+      installPhotoFileID: draft.installPhotoFileID,
+      fieldConfidence: draft.fieldConfidence
     })
     draft.saved = true
     draft.statusText = `已保存，记录 ${result.recordId}`
@@ -1406,6 +2536,7 @@ async function saveDraft(draft) {
     ElMessage.success('已保存到共享台账')
     await loadEquipments()
   } catch (error) {
+    if (error === 'cancel' || error?.message === 'cancel') return
     ElMessage.error(error.message || '保存失败')
   } finally {
     draft.saving = false
@@ -1418,6 +2549,7 @@ function goToEquipments() {
 
 onMounted(async () => {
   await loadEquipments()
+  await restoreRecognitionTasks()
 })
 </script>
 
@@ -1461,6 +2593,60 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.quick-prompt-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.quick-prompt-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(30, 94, 255, 0.14);
+  border-radius: 20px;
+  padding: 16px 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(243, 247, 255, 0.96) 100%);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.05);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: rgba(30, 94, 255, 0.3);
+    box-shadow: 0 18px 36px rgba(30, 94, 255, 0.12);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+  }
+}
+
+.quick-prompt-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #2563eb;
+}
+
+.quick-prompt-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.quick-prompt-copy {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-sub);
 }
 
 .hidden-input {
@@ -1757,6 +2943,9 @@ onMounted(async () => {
 
 .message-row {
   display: flex;
+  width: 100%;
+  align-items: flex-end;
+  gap: 12px;
   margin-bottom: 14px;
 
   &.assistant {
@@ -1764,23 +2953,106 @@ onMounted(async () => {
   }
 
   &.user {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+  }
+}
+
+.message-avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+
+  &.assistant {
+    background:
+      radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.78) 0 16%, transparent 17%),
+      linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 94, 255, 0.94) 100%);
+    color: #fff;
+  }
+
+  &.user {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(14, 165, 233, 0.9) 100%);
+    color: #fff;
+  }
+}
+
+.avatar-glyph {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.avatar-svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.message-stack {
+  max-width: 82%;
+  display: grid;
+  gap: 6px;
+
+  .user & {
+    justify-items: end;
+    text-align: right;
+  }
+}
+
+.message-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+
+  .user & {
     justify-content: flex-end;
   }
 }
 
+.message-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.message-badge {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(22, 163, 74, 0.96);
+  background: rgba(220, 252, 231, 0.92);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+}
+
 .message-bubble {
-  max-width: 82%;
-  border-radius: 22px;
+  border-radius: 24px;
   padding: 14px 16px;
   background: rgba(241, 245, 249, 0.9);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  width: fit-content;
+  max-width: 100%;
 
   .assistant & {
-    background: rgba(30, 94, 255, 0.08);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(243, 247, 255, 0.94) 100%);
+    border-top-left-radius: 10px;
+    border: 1px solid rgba(30, 94, 255, 0.08);
   }
 
   .user & {
     background: linear-gradient(135deg, rgba(30, 94, 255, 0.92) 0%, rgba(63, 140, 255, 0.92) 100%);
     color: #fff;
+    border-top-right-radius: 10px;
   }
 }
 
@@ -1788,17 +3060,55 @@ onMounted(async () => {
   width: min(540px, 100%);
 }
 
-.message-meta {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  opacity: 0.72;
-}
-
 .message-text {
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.7;
+}
+
+.message-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: rgba(100, 116, 139, 0.9);
+
+  .user & {
+    justify-content: flex-end;
+  }
+}
+
+.typing-card {
+  display: grid;
+  gap: 12px;
+}
+
+.typing-copy {
+  color: var(--text-main);
+  line-height: 1.7;
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(30, 94, 255, 0.42);
+    animation: typing-bounce 1.2s ease-in-out infinite;
+  }
+
+  span:nth-child(2) {
+    animation-delay: 0.16s;
+  }
+
+  span:nth-child(3) {
+    animation-delay: 0.32s;
+  }
 }
 
 .process-card {
@@ -1922,12 +3232,213 @@ onMounted(async () => {
   border-radius: 20px;
 }
 
+.history-panel {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.96) 0%, rgba(241, 245, 255, 0.96) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+
+  h4 {
+    font-size: 16px;
+    color: var(--text-main);
+  }
+
+  p {
+    margin-top: 6px;
+    color: var(--text-sub);
+    line-height: 1.6;
+    font-size: 13px;
+  }
+}
+
+.history-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.history-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+
+  &.done {
+    border-color: rgba(16, 185, 129, 0.22);
+  }
+
+  &.error {
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+}
+
+.history-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.history-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.history-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.history-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.history-summary {
+  color: var(--text-sub);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.history-empty {
+  border-radius: 18px;
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--text-sub);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.job-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+
+  h4 {
+    color: var(--text-main);
+    font-size: 18px;
+  }
+
+  p {
+    margin-top: 6px;
+    color: var(--text-sub);
+  }
+}
+
+.job-section-title {
+  margin: 18px 0 10px;
+  color: var(--text-main);
+  font-size: 16px;
+}
+
+.job-raw-text {
+  margin: 0;
+  padding: 14px;
+  max-height: 240px;
+  overflow: auto;
+  border-radius: 16px;
+  background: rgba(241, 245, 249, 0.9);
+  color: var(--text-sub);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.job-detail-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .draft-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
   overflow: auto;
   padding-right: 4px;
+}
+
+.conflict-desk {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid rgba(245, 158, 11, 0.26);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 247, 237, 0.82));
+}
+
+.conflict-head,
+.conflict-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conflict-head h4 {
+  color: var(--text-main);
+  font-size: 16px;
+}
+
+.conflict-head p {
+  margin-top: 4px;
+  color: var(--text-sub);
+  font-size: 13px;
+}
+
+.conflict-actions {
+  align-items: center;
+}
+
+.conflict-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.conflict-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  color: var(--text-sub);
+  font-size: 13px;
 }
 
 .draft-card {
@@ -1955,10 +3466,24 @@ onMounted(async () => {
   }
 }
 
+.confidence-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
 .draft-body {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   gap: 18px;
+}
+
+.draft-form:only-child {
+  grid-column: 1 / -1;
 }
 
 .draft-preview {
@@ -1972,12 +3497,76 @@ onMounted(async () => {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 16px;
+}
+
+.draft-form {
+  min-width: 0;
+}
+
+.draft-form :deep(.el-input),
+.draft-form :deep(.el-select) {
+  width: 100%;
+}
+
+.draft-form :deep(.el-input__wrapper),
+.draft-form :deep(.el-select__wrapper) {
+  min-height: 40px;
+}
+
+.draft-form :deep(.el-input__inner),
+.draft-form :deep(.el-select__selected-item) {
+  min-width: 0;
 }
 
 .equipment-item {
   grid-column: 1 / -1;
+}
+
+.confidence-badge {
+  display: inline-flex;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.draft-form :deep(.confidence-low .el-input__wrapper),
+.draft-form :deep(.confidence-low .el-select__wrapper) {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.44) inset;
+  background: rgba(254, 242, 242, 0.88);
+}
+
+.draft-form :deep(.confidence-low .confidence-badge) {
+  color: #dc2626;
+}
+
+.draft-form :deep(.confidence-medium .confidence-badge) {
+  color: #d97706;
+}
+
+.site-photo-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.site-photo-box img,
+.site-photo-empty {
+  width: 120px;
+  height: 86px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  object-fit: cover;
+}
+
+.site-photo-empty {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  background: rgba(241, 245, 249, 0.82);
+  font-size: 12px;
 }
 
 .draft-actions {
@@ -2007,6 +3596,19 @@ onMounted(async () => {
   .draft-body {
     grid-template-columns: 1fr;
   }
+
+  .quick-prompt-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .history-head,
+  .history-card {
+    flex-direction: column;
+  }
+
+  .history-actions {
+    align-self: flex-start;
+  }
 }
 
 @keyframes pulse-step {
@@ -2018,6 +3620,20 @@ onMounted(async () => {
 
   50% {
     transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes typing-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.38;
+  }
+
+  40% {
+    transform: translateY(-4px);
     opacity: 1;
   }
 }

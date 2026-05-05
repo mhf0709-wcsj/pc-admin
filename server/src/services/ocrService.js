@@ -31,7 +31,25 @@ async function getAccessToken() {
   return cachedToken
 }
 
+function getApiPlan() {
+  const mode = String(process.env.BAIDU_OCR_MODE || 'fast').trim().toLowerCase()
+  if (mode === 'accurate') return ['accurate_basic', 'accurate', 'general_basic']
+  return ['general_basic', 'accurate_basic', 'accurate']
+}
+
+function normalizeLines(ocrResult = {}) {
+  return (ocrResult.words_result || [])
+    .filter((item) => !item.probability || item.probability.average >= 0.45)
+    .map((item) => ({
+      text: String(item.words || '').trim(),
+      location: item.location || null,
+      probability: item.probability ? item.probability.average : null
+    }))
+    .filter((item) => item.text)
+}
+
 async function callBaiduOcr(accessToken, imageBase64, apiType) {
+  const startedAt = Date.now()
   const params = new URLSearchParams()
   params.append('image', imageBase64)
   params.append('access_token', accessToken)
@@ -53,13 +71,21 @@ async function callBaiduOcr(accessToken, imageBase64, apiType) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      timeout: 30000
+      timeout: Number(process.env.BAIDU_OCR_TIMEOUT_MS || 22000)
     }
   )
 
   if (response.data.error_code) {
-    throw new Error(response.data.error_msg || `Baidu OCR error: ${response.data.error_code}`)
+    const error = new Error(response.data.error_msg || `Baidu OCR error: ${response.data.error_code}`)
+    error.code = response.data.error_code
+    throw error
   }
+
+  console.log('[ocr.service] baidu.success', {
+    apiType,
+    durationMs: Date.now() - startedAt,
+    words: response.data.words_result_num || response.data.words_result?.length || 0
+  })
 
   return response.data
 }
@@ -71,41 +97,39 @@ async function runOcr(payload = {}) {
   }
 
   const accessToken = await getAccessToken()
-  let ocrResult = null
-  let apiUsed = ''
+  const apiPlan = getApiPlan()
+  let lastError = null
 
-  try {
-    ocrResult = await callBaiduOcr(accessToken, imageBase64, 'accurate_basic')
-    apiUsed = 'accurate_basic'
-  } catch (error) {
+  for (const apiType of apiPlan) {
+    const startedAt = Date.now()
     try {
-      ocrResult = await callBaiduOcr(accessToken, imageBase64, 'general_basic')
-      apiUsed = 'general_basic'
-    } catch (fallbackError) {
-      ocrResult = await callBaiduOcr(accessToken, imageBase64, 'accurate')
-      apiUsed = 'accurate'
+      const ocrResult = await callBaiduOcr(accessToken, imageBase64, apiType)
+      const lines = normalizeLines(ocrResult)
+
+      if (lines.length) {
+        return {
+          success: true,
+          text: lines.map((line) => line.text).join('\n'),
+          lines,
+          total: lines.length,
+          apiUsed: apiType,
+          durationMs: Date.now() - startedAt
+        }
+      }
+
+      lastError = new Error(`${apiType} 未检测到文字`)
+    } catch (error) {
+      lastError = error
+      console.warn('[ocr.service] baidu.failed', {
+        apiType,
+        durationMs: Date.now() - startedAt,
+        message: error.message,
+        code: error.code || ''
+      })
     }
   }
 
-  if (!ocrResult?.words_result?.length) {
-    throw new Error('No OCR text was detected')
-  }
-
-  const lines = ocrResult.words_result
-    .filter((item) => !item.probability || item.probability.average >= 0.5)
-    .map((item) => ({
-      text: item.words,
-      location: item.location || null,
-      probability: item.probability ? item.probability.average : null
-    }))
-
-  return {
-    success: true,
-    text: lines.map((line) => line.text).join('\n'),
-    lines,
-    total: lines.length,
-    apiUsed
-  }
+  throw lastError || new Error('No OCR text was detected')
 }
 
 module.exports = {

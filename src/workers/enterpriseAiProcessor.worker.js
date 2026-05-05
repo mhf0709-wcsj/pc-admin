@@ -29,23 +29,30 @@ async function fileToBase64(file) {
   return arrayBufferToBase64(buffer)
 }
 
+async function sha256Base64(value) {
+  const data = new TextEncoder().encode(String(value || ''))
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 async function compressImageFile(file, options = {}) {
-  const maxWidth = options.maxWidth || 1600
-  const maxHeight = options.maxHeight || 1600
-  const quality = options.quality || 0.8
-  const passThroughMaxBytes = options.passThroughMaxBytes || 1.2 * 1024 * 1024
+  const maxWidth = options.maxWidth || 1400
+  const maxHeight = options.maxHeight || 1400
+  const quality = options.quality || 0.74
+  const passThroughMaxBytes = options.passThroughMaxBytes || 900 * 1024
 
   const bitmap = await createImageBitmap(file)
   const sourceWidth = bitmap.width
   const sourceHeight = bitmap.height
   const scale = Math.min(1, maxWidth / sourceWidth, maxHeight / sourceHeight)
+  const canSkip = file.size <= passThroughMaxBytes && scale >= 0.98 && /jpe?g$/i.test(file.type || file.name)
 
-  if (file.size <= passThroughMaxBytes && scale >= 0.98) {
+  if (canSkip) {
     bitmap.close()
     return {
       file,
       skipped: true,
-      reason: '图片尺寸合适，跳过压缩'
+      reason: '图片已足够小，跳过压缩'
     }
   }
 
@@ -69,22 +76,23 @@ async function compressImageFile(file, options = {}) {
   context.drawImage(bitmap, 0, 0, targetWidth, targetHeight)
   bitmap.close()
 
-  const mimeType = 'image/jpeg'
-  const blob = await canvas.convertToBlob({ type: mimeType, quality })
+  const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality })
   if (!blob) {
     throw new Error('图片压缩失败')
   }
 
+  const compressedFile = new File([blob], file.name.replace(/\.(png|webp|bmp)$/i, '.jpg'), {
+    type: 'image/jpeg',
+    lastModified: Date.now()
+  })
+
   return {
-    file: new File([blob], file.name.replace(/\.(png|webp)$/i, '.jpg'), {
-      type: mimeType,
-      lastModified: Date.now()
-    }),
+    file: compressedFile,
     skipped: false,
     reason:
       scale < 0.98
-        ? `已压缩 ${sourceWidth}×${sourceHeight} -> ${targetWidth}×${targetHeight}`
-        : '已转换为更轻量的图片格式'
+        ? `已压缩 ${sourceWidth}x${sourceHeight} -> ${targetWidth}x${targetHeight}，${Math.round(file.size / 1024)}KB -> ${Math.round(compressedFile.size / 1024)}KB`
+        : `已转为更轻量的图片格式，${Math.round(file.size / 1024)}KB -> ${Math.round(compressedFile.size / 1024)}KB`
   }
 }
 
@@ -114,17 +122,10 @@ function buildPdfPageText(items = []) {
   return Array.from(rows.entries())
     .sort((a, b) => b[0] - a[0])
     .map(([, lineItems]) => {
-      const sorted = lineItems.sort((a, b) => a.x - b.x)
       const merged = []
-      for (const item of sorted) {
+      for (const item of lineItems.sort((a, b) => a.x - b.x)) {
         const last = merged[merged.length - 1]
-        if (
-          last &&
-          item.str &&
-          item.str === last.str &&
-          item.str.length <= 2 &&
-          Math.abs(item.x - last.x) < 3
-        ) {
+        if (last && item.str === last.str && item.str.length <= 2 && Math.abs(item.x - last.x) < 3) {
           continue
         }
         merged.push(item)
@@ -137,8 +138,8 @@ function buildPdfPageText(items = []) {
 }
 
 async function renderPdfFirstPage(file, options = {}) {
-  const scale = options.scale || 1.8
-  const quality = options.quality || 0.92
+  const scale = options.scale || 1.2
+  const quality = options.quality || 0.76
   const buffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
   const page = await pdf.getPage(1)
@@ -162,7 +163,7 @@ async function renderPdfFirstPage(file, options = {}) {
   })
 
   await page.render({ canvasContext: context, viewport }).promise
-  const pageBlob = await canvas.convertToBlob({ type: 'image/png', quality })
+  const pageBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality })
   if (!pageBlob) {
     throw new Error('PDF 页面渲染失败')
   }
@@ -205,11 +206,7 @@ async function requestOcr(baseUrl, token, imageBase64, options = {}) {
     } catch (error) {
       clearTimeout(timer)
       lastError = error?.name === 'AbortError' ? new Error('OCR 请求超时') : error
-
-      if (attempt >= retryLimit) {
-        throw lastError
-      }
-
+      if (attempt >= retryLimit) throw lastError
       await sleep(retryDelay * (attempt + 1))
     }
   }
@@ -224,6 +221,7 @@ self.onmessage = async (event) => {
     if (type === 'process-image') {
       const compressed = await compressImageFile(payload.file, payload.compressOptions)
       const imageBase64 = await fileToBase64(compressed.file)
+      const imageHash = await sha256Base64(imageBase64)
 
       let ocrText = ''
       if (payload.baseUrl) {
@@ -237,7 +235,9 @@ self.onmessage = async (event) => {
           compressedFile: compressed.file,
           compressReason: compressed.reason,
           skippedCompression: compressed.skipped,
-          imageBase64: payload.baseUrl ? '' : imageBase64,
+          imageBase64: payload.returnBase64 === false ? '' : imageBase64,
+          imageHash,
+          sourceSize: compressed.file.size,
           ocrText
         }
       })
@@ -246,11 +246,7 @@ self.onmessage = async (event) => {
 
     if (type === 'process-pdf-first-page') {
       const result = await renderPdfFirstPage(payload.file, payload.pdfOptions)
-      self.postMessage({
-        id,
-        ok: true,
-        result
-      })
+      self.postMessage({ id, ok: true, result })
       return
     }
 

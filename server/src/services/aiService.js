@@ -309,5 +309,6 @@ async function handleAiPayload(payload = {}, session, meta = {}) {
 }
 
 module.exports = {
-  handleAiPayload
+  handleAiPayload,
+  extractRecordFromText
 }

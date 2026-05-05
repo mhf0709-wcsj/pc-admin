@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visibleProxy" title="企业详情" size="560px" destroy-on-close>
+  <el-drawer v-model="visibleProxy" title="企业详情" size="620px" destroy-on-close>
     <template v-if="enterprise">
       <section class="detail-hero">
         <div>
@@ -29,67 +29,67 @@
         <el-descriptions-item label="辖区">{{ enterprise.district || '-' }}</el-descriptions-item>
         <el-descriptions-item label="联系人">{{ enterprise.contact || '-' }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ enterprise.phone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="统一社会信用代码">{{ enterprise.creditCode || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="信用代码">{{ enterprise.creditCode || '-' }}</el-descriptions-item>
         <el-descriptions-item label="最近到期">{{ enterprise.latestExpiryDate || '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ enterprise.createdAt || '-' }}</el-descriptions-item>
       </el-descriptions>
+
+      <section class="risk-status-box">
+        <div class="risk-status-head">
+          <div>
+            <h4>风险处置状态</h4>
+            <p>用于记录该企业风险闭环进度，例如已通知、已复检或已关闭。</p>
+          </div>
+          <el-tag effect="plain">{{ riskStatusLabel(statusForm.riskStatus) }}</el-tag>
+        </div>
+        <el-form :model="statusForm" label-width="80px">
+          <el-form-item label="状态">
+            <el-select v-model="statusForm.riskStatus">
+              <el-option label="未处理" value="pending" />
+              <el-option label="已通知" value="notified" />
+              <el-option label="已复检" value="rechecked" />
+              <el-option label="已关闭" value="closed" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="statusForm.riskStatusNote" type="textarea" :rows="2" placeholder="填写本次处置说明" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="statusSaving" @click="saveRiskStatus">保存处置状态</el-button>
+            <span class="status-time">最近更新：{{ localEnterprise.riskStatusUpdateTime || '暂无' }}</span>
+          </el-form-item>
+        </el-form>
+      </section>
 
       <section class="risk-section">
         <div class="risk-section-head">
           <div>
             <h4>最近风险记录</h4>
-            <p>优先展示该企业最近的过期或 30 天内到期记录，便于抽屉内直接判断处理重点。</p>
+            <p>优先展示该企业最近的过期或 30 天内到期记录，可在抽屉内继续展开记录详情。</p>
           </div>
-          <el-button text type="primary" :loading="riskLoading" @click="loadRiskRecords">
-            刷新
-          </el-button>
+          <el-button text type="primary" :loading="riskLoading" @click="loadRiskRecords">刷新</el-button>
         </div>
-
-        <div class="risk-overview">
-          <div class="risk-overview-card">
-            <span>风险记录数</span>
-            <strong>{{ riskRecords.length }}</strong>
-          </div>
-          <div class="risk-overview-card danger">
-            <span>已过期</span>
-            <strong>{{ riskOverview.expired }}</strong>
-          </div>
-          <div class="risk-overview-card warning">
-            <span>30 天内到期</span>
-            <strong>{{ riskOverview.expiring }}</strong>
-          </div>
-        </div>
-
-        <el-alert
-          v-if="riskError"
-          type="warning"
-          :closable="false"
-          show-icon
-          class="risk-alert"
-          :title="riskError"
-        />
 
         <div v-loading="riskLoading" class="risk-list-shell">
           <div v-if="riskRecords.length" class="risk-list">
             <button
               v-for="item in riskRecords"
-              :key="item.certNo || item.factoryNo || item.expiryDate"
+              :key="item._id || item.certNo || item.factoryNo"
               type="button"
               class="risk-item"
               @click="openRecordDetail(item)"
             >
-              <div class="risk-item-main">
-                <div class="risk-item-title">
-                  <strong>{{ item.certNo || '未填写证书编号' }}</strong>
-                  <el-tag :type="getRecordRiskType(item)" size="small" effect="light">
-                    {{ getRecordRiskLabel(item) }}
-                  </el-tag>
-                </div>
-                <p>{{ item.equipmentName || item.instrumentName || '未填写设备名称' }}</p>
+              <div class="risk-item-title">
+                <strong>{{ item.certNo || '未填写证书编号' }}</strong>
+                <el-tag :type="getRecordRiskType(item)" size="small" effect="light">
+                  {{ getRecordRiskLabel(item) }}
+                </el-tag>
               </div>
+              <p>{{ item.equipmentName || item.instrumentName || '未填写设备名称' }}</p>
               <div class="risk-item-meta">
                 <span>结论：{{ item.conclusion || '未知' }}</span>
                 <span>到期：{{ item.expiryDate || '-' }}</span>
+                <span>处置：{{ riskStatusLabel(item.riskStatus) }}</span>
               </div>
             </button>
           </div>
@@ -107,46 +107,48 @@
       v-model="recordDetailVisible"
       :record="selectedRecord"
       @records="emit('records', $event)"
+      @saved="loadRiskRecords"
     />
   </el-drawer>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { getRecords } from '@/api/regulator'
+import { ElMessage } from 'element-plus'
+import { getRecords, updateEnterpriseRiskStatus } from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 import RecordDetailDrawer from '@/components/RecordDetailDrawer.vue'
 
 const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  },
-  enterprise: {
-    type: Object,
-    default: null
-  }
+  modelValue: { type: Boolean, default: false },
+  enterprise: { type: Object, default: null }
 })
 
-const emit = defineEmits(['update:modelValue', 'records', 'risk-records'])
+const emit = defineEmits(['update:modelValue', 'records', 'risk-records', 'saved'])
 
 const userStore = useUserStore()
 const riskLoading = ref(false)
-const riskError = ref('')
 const riskRecords = ref([])
 const recordDetailVisible = ref(false)
 const selectedRecord = ref(null)
+const statusSaving = ref(false)
+const localEnterprise = ref({})
+const statusForm = reactive({
+  riskStatus: 'pending',
+  riskStatusNote: ''
+})
 
 const visibleProxy = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 })
 
-const companyName = computed(() => props.enterprise?.companyName || props.enterprise?.enterpriseName || '')
+const enterprise = computed(() => localEnterprise.value)
+const companyName = computed(() => enterprise.value?.companyName || enterprise.value?.enterpriseName || '')
 const riskLabel = computed(() => {
-  if ((props.enterprise?.expiredCount || 0) > 0) return '高风险'
-  if ((props.enterprise?.expiringCount || 0) > 0) return '中风险'
+  if ((enterprise.value?.expiredCount || 0) > 0) return '高风险'
+  if ((enterprise.value?.expiringCount || 0) > 0) return '中风险'
   return '低风险'
 })
 const riskTagType = computed(() => {
@@ -154,10 +156,16 @@ const riskTagType = computed(() => {
   if (riskLabel.value === '中风险') return 'warning'
   return 'success'
 })
-const riskOverview = computed(() => ({
-  expired: riskRecords.value.filter((item) => getRecordRiskLabel(item) === '已过期').length,
-  expiring: riskRecords.value.filter((item) => getRecordRiskLabel(item) === '30 天内到期').length
-}))
+
+watch(
+  () => props.enterprise,
+  (value) => {
+    localEnterprise.value = value ? { ...value } : {}
+    statusForm.riskStatus = localEnterprise.value.riskStatus || 'pending'
+    statusForm.riskStatusNote = localEnterprise.value.riskStatusNote || ''
+  },
+  { immediate: true }
+)
 
 watch(
   () => [props.modelValue, companyName.value],
@@ -167,7 +175,6 @@ watch(
       return
     }
     if (!visible) {
-      riskError.value = ''
       riskRecords.value = []
       recordDetailVisible.value = false
       selectedRecord.value = null
@@ -175,6 +182,16 @@ watch(
   },
   { immediate: true }
 )
+
+function riskStatusLabel(value) {
+  return {
+    pending: '未处理',
+    notified: '已通知',
+    rechecked: '已复检',
+    closed: '已关闭',
+    normal: '正常'
+  }[value || 'pending'] || '未处理'
+}
 
 function emitRecords() {
   emit('records', companyName.value)
@@ -208,7 +225,6 @@ function getRecordRiskType(record) {
 async function loadRiskRecords() {
   if (!companyName.value || !userStore.user) return
   riskLoading.value = true
-  riskError.value = ''
   try {
     const result = await getRecords(userStore.user, {
       enterpriseName: companyName.value,
@@ -217,21 +233,49 @@ async function loadRiskRecords() {
       pageSize: 5
     })
     riskRecords.value = result.list || []
-  } catch (error) {
-    riskRecords.value = []
-    riskError.value = error?.message || '最近风险记录加载失败，请稍后重试'
   } finally {
     riskLoading.value = false
+  }
+}
+
+async function saveRiskStatus() {
+  statusSaving.value = true
+  try {
+    const result = await updateEnterpriseRiskStatus(userStore.user, {
+      id: localEnterprise.value._id,
+      companyName: companyName.value,
+      riskStatus: statusForm.riskStatus,
+      riskStatusNote: statusForm.riskStatusNote
+    })
+    localEnterprise.value = {
+      ...localEnterprise.value,
+      ...(result.enterprise || {}),
+      riskStatus: statusForm.riskStatus,
+      riskStatusNote: statusForm.riskStatusNote
+    }
+    ElMessage.success('风险处置状态已保存')
+    emit('saved', localEnterprise.value)
+  } catch (error) {
+    ElMessage.error(error?.message || '保存处置状态失败')
+  } finally {
+    statusSaving.value = false
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.detail-hero {
+.detail-hero,
+.risk-section-head,
+.risk-status-head,
+.drawer-actions,
+.risk-item-title {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.detail-hero {
   margin-bottom: 18px;
 
   h3 {
@@ -245,19 +289,14 @@ async function loadRiskRecords() {
   }
 }
 
-.detail-summary,
-.risk-overview {
+.detail-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-}
-
-.detail-summary {
   margin-bottom: 18px;
 }
 
-.detail-summary-card,
-.risk-overview-card {
+.detail-summary-card {
   background: rgba(15, 23, 42, 0.04);
   border-radius: 18px;
   padding: 16px;
@@ -291,21 +330,47 @@ async function loadRiskRecords() {
   }
 }
 
+.risk-status-box,
 .risk-section {
   margin-top: 22px;
 }
 
-.risk-section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+.risk-status-box {
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.06);
+
+  :deep(.el-select) {
+    width: 100%;
+  }
+}
+
+.risk-status-head {
   margin-bottom: 14px;
 
   h4 {
     color: var(--text-main);
     font-size: 16px;
-    font-weight: 700;
+  }
+
+  p {
+    margin-top: 6px;
+    color: var(--text-sub);
+  }
+}
+
+.status-time {
+  margin-left: 12px;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+.risk-section-head {
+  margin-bottom: 14px;
+
+  h4 {
+    color: var(--text-main);
+    font-size: 16px;
   }
 
   p {
@@ -316,12 +381,7 @@ async function loadRiskRecords() {
   }
 }
 
-.risk-alert {
-  margin-top: 12px;
-}
-
 .risk-list-shell {
-  margin-top: 14px;
   min-height: 140px;
 }
 
@@ -338,61 +398,41 @@ async function loadRiskRecords() {
   background: rgba(248, 250, 252, 0.82);
   padding: 14px 16px;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-float);
-  }
 }
 
-.risk-item-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-
-  strong {
-    color: var(--text-main);
-    font-size: 15px;
-  }
+.risk-item-title strong {
+  color: var(--text-main);
+  font-size: 15px;
 }
 
-.risk-item-main p {
+.risk-item p,
+.risk-item-meta {
   margin-top: 8px;
   color: var(--text-sub);
   font-size: 13px;
 }
 
 .risk-item-meta {
-  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-
-  span {
-    font-size: 12px;
-    color: var(--text-sub);
-  }
 }
 
 .drawer-actions {
   margin-top: 20px;
-  display: flex;
   justify-content: flex-end;
-  gap: 12px;
 }
 
 @media (max-width: 768px) {
   .detail-hero,
   .drawer-actions,
   .risk-section-head,
+  .risk-status-head,
   .risk-item-title {
     flex-direction: column;
   }
 
-  .detail-summary,
-  .risk-overview {
+  .detail-summary {
     grid-template-columns: 1fr;
   }
 }

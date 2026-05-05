@@ -36,6 +36,7 @@ function requireSession(req) {
   if (!session) {
     const error = new Error('Unauthorized')
     error.statusCode = 401
+    error.code = 'UNAUTHORIZED'
     throw error
   }
   return session
@@ -113,6 +114,7 @@ app.use((error, req, res, next) => {
   const statusCode = Number(error.statusCode || 400)
   const payload = {
     success: false,
+    code: error.code || `HTTP_${statusCode}`,
     message: error.message || 'Server error'
   }
 

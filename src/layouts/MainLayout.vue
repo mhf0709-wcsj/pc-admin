@@ -67,7 +67,7 @@
       <header class="header">
         <div class="header-left">
           <el-icon class="collapse-btn" @click="isCollapsed = !isCollapsed">
-            <component :is="isCollapsed ? 'Expand' : 'Fold'" />
+            <component :is="isCollapsed ? Expand : Fold" />
           </el-icon>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/' }">
@@ -121,6 +121,8 @@ import {
   ChatDotRound,
   DataBoard,
   Document,
+  Expand,
+  Fold,
   Monitor,
   OfficeBuilding,
   Setting,

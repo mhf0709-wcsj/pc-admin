@@ -3,7 +3,7 @@
     <div class="page-header">
       <h1 class="page-title">台账中心</h1>
       <p class="page-subtitle">
-        统一查看检定记录、到期风险和企业送检情况，支持筛选、详情联动和导出当前结果。
+        统一查看检定记录、到期风险和企业送检情况，支持批量选择、批量导出、批量发送到期提醒和记录修正。
       </p>
     </div>
 
@@ -26,6 +26,12 @@
           <el-option label="合格" value="合格" />
           <el-option label="不合格" value="不合格" />
         </el-select>
+        <el-select v-model="filters.riskStatus" placeholder="全部处置状态" clearable>
+          <el-option label="未处理" value="pending" />
+          <el-option label="已通知" value="notified" />
+          <el-option label="已复检" value="rechecked" />
+          <el-option label="已关闭" value="closed" />
+        </el-select>
       </div>
 
       <div class="quick-filters">
@@ -42,26 +48,18 @@
       </div>
 
       <div class="summary-strip">
-        <div class="summary-pill">
-          <span>当前结果</span>
-          <strong>{{ total }}</strong>
-        </div>
-        <div class="summary-pill danger">
-          <span>已过期</span>
-          <strong>{{ riskSummary.expired }}</strong>
-        </div>
-        <div class="summary-pill warning">
-          <span>30 天内到期</span>
-          <strong>{{ riskSummary.expiring }}</strong>
-        </div>
-        <div class="summary-pill">
-          <span>当前页</span>
-          <strong>{{ records.length }}</strong>
-        </div>
+        <div class="summary-pill"><span>当前结果</span><strong>{{ total }}</strong></div>
+        <div class="summary-pill danger"><span>已过期</span><strong>{{ riskSummary.expired }}</strong></div>
+        <div class="summary-pill warning"><span>30 天内到期</span><strong>{{ riskSummary.expiring }}</strong></div>
+        <div class="summary-pill"><span>已选中</span><strong>{{ selectedRows.length }}</strong></div>
       </div>
 
       <div class="toolbar-actions">
         <el-button @click="resetFilters">重置筛选</el-button>
+        <el-button :disabled="!selectedRows.length" @click="exportSelected">批量导出</el-button>
+        <el-button :disabled="!selectedRows.length" :loading="reminding" @click="sendSelectedReminders">
+          批量发送到期提醒
+        </el-button>
         <el-button :loading="exporting" @click="exportCurrentFilters">导出当前筛选</el-button>
         <el-button type="primary" :loading="loading" @click="submitQuery">立即查询</el-button>
       </div>
@@ -71,11 +69,19 @@
       <div class="panel-head">
         <div>
           <h3>检定记录</h3>
-          <p>共 {{ total }} 条结果，支持风险筛选、详情查看和按当前结果导出。</p>
+          <p>共 {{ total }} 条结果，可批量勾选后导出或发送到期提醒。</p>
         </div>
       </div>
 
-      <el-table v-loading="loading" :data="records" stripe @row-click="openRecordDetail">
+      <el-table
+        v-loading="loading"
+        :data="records"
+        stripe
+        row-key="_id"
+        @row-click="openRecordDetail"
+        @selection-change="selectedRows = $event"
+      >
+        <el-table-column type="selection" width="48" />
         <el-table-column label="证书编号" prop="certNo" min-width="160" show-overflow-tooltip />
         <el-table-column label="出厂编号" prop="factoryNo" min-width="140" show-overflow-tooltip />
         <el-table-column label="企业" prop="enterpriseName" min-width="180" show-overflow-tooltip />
@@ -93,6 +99,11 @@
             <el-tag :type="getRiskTagType(row)" size="small" effect="light">
               {{ getRiskLabel(row) }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="处置状态" width="110">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">{{ riskStatusLabel(row.riskStatus) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="检定日期" prop="verificationDate" width="120" />
@@ -125,6 +136,7 @@
       v-model="detailVisible"
       :record="selectedRecord"
       @records="goToEnterpriseRecords"
+      @saved="handleRecordSaved"
     />
   </div>
 </template>
@@ -133,9 +145,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { batchSendReminderSms, getRecords } from '@/api/regulator'
 import { districts } from '@/api/config'
-import { getRecords } from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 import RecordDetailDrawer from '@/components/RecordDetailDrawer.vue'
 
@@ -145,7 +157,9 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const exporting = ref(false)
+const reminding = ref(false)
 const records = ref([])
+const selectedRows = ref([])
 const total = ref(0)
 const enterpriseOptions = ref([])
 const detailVisible = ref(false)
@@ -163,7 +177,8 @@ const filters = reactive({
   district: '',
   enterpriseName: '',
   conclusion: '',
-  filterType: ''
+  filterType: '',
+  riskStatus: ''
 })
 
 const pagination = reactive({
@@ -185,6 +200,7 @@ const riskSummary = computed(() => {
 function applyRouteFilter() {
   filters.enterpriseName = route.query.enterprise || ''
   filters.filterType = route.query.filter || ''
+  filters.riskStatus = route.query.riskStatus || ''
 }
 
 async function loadRecords() {
@@ -198,6 +214,7 @@ async function loadRecords() {
     records.value = result.list || []
     total.value = result.total || 0
     enterpriseOptions.value = result.enterpriseOptions || []
+    selectedRows.value = []
   } finally {
     loading.value = false
   }
@@ -220,6 +237,7 @@ function resetFilters() {
   filters.enterpriseName = ''
   filters.conclusion = ''
   filters.filterType = ''
+  filters.riskStatus = ''
   pagination.page = 1
   loadRecords()
 }
@@ -227,6 +245,22 @@ function resetFilters() {
 function openRecordDetail(row) {
   selectedRecord.value = row
   detailVisible.value = true
+}
+
+function handleRecordSaved(record) {
+  const index = records.value.findIndex((item) => item._id === record._id)
+  if (index >= 0) records.value[index] = record
+  selectedRecord.value = record
+}
+
+function riskStatusLabel(value) {
+  return {
+    pending: '未处理',
+    notified: '已通知',
+    rechecked: '已复检',
+    closed: '已关闭',
+    normal: '正常'
+  }[value || 'pending'] || '未处理'
 }
 
 function getRiskLabel(row) {
@@ -270,6 +304,7 @@ function buildCsv(rows) {
     '辖区',
     '检定结论',
     '风险状态',
+    '处置状态',
     '检定日期',
     '到期日期'
   ]
@@ -283,6 +318,7 @@ function buildCsv(rows) {
     item.district,
     item.conclusion,
     getRiskLabel(item),
+    riskStatusLabel(item.riskStatus),
     item.verificationDate,
     item.expiryDate
   ].map(escapeCsvValue).join(','))
@@ -302,6 +338,20 @@ function downloadBlob(content, filename) {
   URL.revokeObjectURL(url)
 }
 
+function exportRows(rows, scope) {
+  if (!rows.length) {
+    ElMessage.warning('没有可导出的记录')
+    return
+  }
+  const timestamp = dayjs().format('YYYYMMDD_HHmmss')
+  downloadBlob(buildCsv(rows), `pressure-records-${scope}-${timestamp}.csv`)
+  ElMessage.success(`已导出 ${rows.length} 条记录`)
+}
+
+function exportSelected() {
+  exportRows(selectedRows.value, 'selected')
+}
+
 async function exportCurrentFilters() {
   exporting.value = true
   try {
@@ -311,26 +361,32 @@ async function exportCurrentFilters() {
       page: 1,
       pageSize: exportPageSize
     })
-    const rows = result.list || []
-    if (!rows.length) {
-      ElMessage.warning('当前筛选结果为空，暂无可导出的记录')
-      return
-    }
-    const timestamp = dayjs().format('YYYYMMDD_HHmmss')
-    downloadBlob(buildCsv(rows), `pressure-records-${timestamp}.csv`)
-    ElMessage.success(`已导出 ${rows.length} 条记录`)
-  } catch (error) {
-    ElMessage.error(error?.message || '导出失败，请稍后重试')
+    exportRows(result.list || [], 'filtered')
   } finally {
     exporting.value = false
   }
 }
 
+async function sendSelectedReminders() {
+  if (!selectedRows.value.length) return
+  await ElMessageBox.confirm(
+    `确认向选中的 ${selectedRows.value.length} 条台账发送到期提醒？当前短信接口为预留占位，会写入操作日志。`,
+    '批量发送提醒',
+    { type: 'warning' }
+  )
+  reminding.value = true
+  try {
+    const result = await batchSendReminderSms(userStore.user, selectedRows.value.map((item) => item._id))
+    ElMessage.success(`已生成 ${result.total || 0} 条提醒任务`)
+  } catch (error) {
+    ElMessage.error(error?.message || '批量发送提醒失败')
+  } finally {
+    reminding.value = false
+  }
+}
+
 function goToEnterpriseRecords(enterpriseName) {
-  router.push({
-    path: '/records',
-    query: { enterprise: enterpriseName }
-  })
+  router.push({ path: '/records', query: { enterprise: enterpriseName } })
 }
 
 onMounted(() => {
@@ -351,15 +407,16 @@ onMounted(() => {
 
 .toolbar-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: 14px;
 }
 
-.quick-filters {
+.quick-filters,
+.summary-strip {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 16px;
-  flex-wrap: wrap;
 }
 
 .quick-chip {
@@ -375,13 +432,6 @@ onMounted(() => {
     background: rgba(30, 94, 255, 0.12);
     color: var(--primary-color);
   }
-}
-
-.summary-strip {
-  margin-top: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 .summary-pill {
@@ -400,20 +450,12 @@ onMounted(() => {
     font-size: 20px;
   }
 
-  &.danger {
-    background: rgba(224, 62, 62, 0.08);
-
-    strong {
-      color: #d03050;
-    }
+  &.danger strong {
+    color: #d03050;
   }
 
-  &.warning {
-    background: rgba(245, 158, 11, 0.12);
-
-    strong {
-      color: #b45309;
-    }
+  &.warning strong {
+    color: #b45309;
   }
 }
 
@@ -422,6 +464,7 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .panel-head {

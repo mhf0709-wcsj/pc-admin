@@ -41,11 +41,26 @@ async function ensureMysqlColumn(connection, tableName, columnName, columnSql) {
   }
 }
 
+async function ensureMysqlIndex(connection, tableName, indexName, indexSql) {
+  const [rows] = await connection.execute(
+    'SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1',
+    [config.mysql.database, tableName, indexName]
+  )
+
+  if (!rows.length) {
+    await connection.query(`ALTER TABLE \`${tableName}\` ADD INDEX ${indexSql}`)
+  }
+}
+
 function ensureSqliteColumn(db, tableName, columnName, columnSql) {
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all()
   if (!rows.some((row) => row.name === columnName)) {
     db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnSql};`)
   }
+}
+
+function ensureSqliteIndex(db, indexSql) {
+  db.exec(indexSql)
 }
 
 async function initMysql() {
@@ -66,6 +81,90 @@ async function initMysql() {
       'pressure_records',
       'installLocation',
       "`installLocation` VARCHAR(240) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'admins',
+      'isDisabled',
+      "`isDisabled` TINYINT(1) NOT NULL DEFAULT 0"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'admins',
+      'lastLoginTime',
+      "`lastLoginTime` VARCHAR(32) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'enterprises',
+      'riskStatus',
+      "`riskStatus` VARCHAR(32) DEFAULT 'pending'"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'enterprises',
+      'riskStatusNote',
+      "`riskStatusNote` VARCHAR(500) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'enterprises',
+      'riskStatusUpdateTime',
+      "`riskStatusUpdateTime` VARCHAR(32) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'pressure_records',
+      'riskStatus',
+      "`riskStatus` VARCHAR(32) DEFAULT 'pending'"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'pressure_records',
+      'remediationStatus',
+      "`remediationStatus` VARCHAR(32) DEFAULT 'pending'"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'pressure_records',
+      'remediationNote',
+      "`remediationNote` VARCHAR(500) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'pressure_records',
+      'remediationUpdateTime',
+      "`remediationUpdateTime` VARCHAR(32) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'pressure_records',
+      'installPhotoFileID',
+      "`installPhotoFileID` LONGTEXT NULL"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'ai_recognition_jobs',
+      'durationMs',
+      "`durationMs` INT NOT NULL DEFAULT 0"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'ai_recognition_jobs',
+      'imageHash',
+      "`imageHash` VARCHAR(80) DEFAULT ''"
+    )
+    await ensureMysqlColumn(
+      connection,
+      'ai_recognition_jobs',
+      'sourceSize',
+      "`sourceSize` INT NOT NULL DEFAULT 0"
+    )
+    await ensureMysqlIndex(
+      connection,
+      'ai_recognition_jobs',
+      'idx_ai_job_owner_hash',
+      'idx_ai_job_owner_hash (`ownerId`, `imageHash`)'
     )
 
     await seedAdmin(
@@ -104,6 +203,20 @@ async function initSqlite() {
     const schemaSql = fs.readFileSync(path.resolve(__dirname, '../sql/schema.sqlite.sql'), 'utf8')
     db.exec(schemaSql)
     ensureSqliteColumn(db, 'pressure_records', 'installLocation', "installLocation TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'admins', 'isDisabled', "isDisabled INTEGER NOT NULL DEFAULT 0")
+    ensureSqliteColumn(db, 'admins', 'lastLoginTime', "lastLoginTime TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'enterprises', 'riskStatus', "riskStatus TEXT DEFAULT 'pending'")
+    ensureSqliteColumn(db, 'enterprises', 'riskStatusNote', "riskStatusNote TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'enterprises', 'riskStatusUpdateTime', "riskStatusUpdateTime TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'pressure_records', 'riskStatus', "riskStatus TEXT DEFAULT 'pending'")
+    ensureSqliteColumn(db, 'pressure_records', 'remediationStatus', "remediationStatus TEXT DEFAULT 'pending'")
+    ensureSqliteColumn(db, 'pressure_records', 'remediationNote', "remediationNote TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'pressure_records', 'remediationUpdateTime', "remediationUpdateTime TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'pressure_records', 'installPhotoFileID', "installPhotoFileID TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'ai_recognition_jobs', 'durationMs', "durationMs INTEGER NOT NULL DEFAULT 0")
+    ensureSqliteColumn(db, 'ai_recognition_jobs', 'imageHash', "imageHash TEXT DEFAULT ''")
+    ensureSqliteColumn(db, 'ai_recognition_jobs', 'sourceSize', "sourceSize INTEGER NOT NULL DEFAULT 0")
+    ensureSqliteIndex(db, 'CREATE INDEX IF NOT EXISTS idx_ai_job_owner_hash ON ai_recognition_jobs (ownerId, imageHash);')
 
     await seedAdmin(
       async (username) => db.prepare('SELECT id FROM admins WHERE username = :username LIMIT 1').get({ username }) || null,

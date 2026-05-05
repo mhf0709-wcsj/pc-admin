@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS admins (
   password VARCHAR(255) NOT NULL,
   role VARCHAR(32) NOT NULL DEFAULT 'admin',
   district VARCHAR(80) DEFAULT '',
+  isDisabled TINYINT(1) NOT NULL DEFAULT 0,
+  lastLoginTime VARCHAR(32) DEFAULT '',
   createTime VARCHAR(32) DEFAULT '',
   updateTime VARCHAR(32) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -18,6 +20,9 @@ CREATE TABLE IF NOT EXISTS enterprises (
   legalPerson VARCHAR(80) DEFAULT '',
   phone VARCHAR(40) DEFAULT '',
   district VARCHAR(80) DEFAULT '',
+  riskStatus VARCHAR(32) DEFAULT 'pending',
+  riskStatusNote VARCHAR(500) DEFAULT '',
+  riskStatusUpdateTime VARCHAR(32) DEFAULT '',
   authType VARCHAR(40) DEFAULT 'web',
   createTime VARCHAR(32) DEFAULT '',
   updateTime VARCHAR(32) DEFAULT '',
@@ -87,6 +92,10 @@ CREATE TABLE IF NOT EXISTS pressure_records (
   verificationDate VARCHAR(32) DEFAULT '',
   expiryDate VARCHAR(32) DEFAULT '',
   district VARCHAR(80) DEFAULT '',
+  riskStatus VARCHAR(32) DEFAULT 'pending',
+  remediationStatus VARCHAR(32) DEFAULT 'pending',
+  remediationNote VARCHAR(500) DEFAULT '',
+  remediationUpdateTime VARCHAR(32) DEFAULT '',
   status VARCHAR(40) DEFAULT 'valid',
   isDeleted TINYINT(1) NOT NULL DEFAULT 0,
   deletedAt VARCHAR(32) DEFAULT '',
@@ -97,6 +106,7 @@ CREATE TABLE IF NOT EXISTS pressure_records (
   hasImage TINYINT(1) NOT NULL DEFAULT 0,
   hasInstallPhoto TINYINT(1) NOT NULL DEFAULT 0,
   fileID VARCHAR(500) DEFAULT '',
+  installPhotoFileID LONGTEXT NULL,
   enterpriseId VARCHAR(64) DEFAULT '',
   enterpriseName VARCHAR(200) NOT NULL,
   enterprisePhone VARCHAR(40) DEFAULT '',
@@ -117,6 +127,18 @@ CREATE TABLE IF NOT EXISTS pressure_records (
   INDEX idx_record_cert (certNo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS record_revision_logs (
+  id VARCHAR(64) PRIMARY KEY,
+  recordId VARCHAR(64) NOT NULL,
+  operatorId VARCHAR(64) DEFAULT '',
+  operatorName VARCHAR(200) DEFAULT '',
+  beforeJson JSON NULL,
+  afterJson JSON NULL,
+  note VARCHAR(500) DEFAULT '',
+  createTime VARCHAR(32) DEFAULT '',
+  INDEX idx_record_revision_record_time (recordId, createTime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS deletion_logs (
   id VARCHAR(64) PRIMARY KEY,
   enterpriseName VARCHAR(200) DEFAULT '',
@@ -128,4 +150,48 @@ CREATE TABLE IF NOT EXISTS deletion_logs (
   deleteTime VARCHAR(32) DEFAULT '',
   snapshot JSON NULL,
   INDEX idx_delete_enterprise_time (enterpriseName, deleteTime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS operation_logs (
+  id VARCHAR(64) PRIMARY KEY,
+  category VARCHAR(80) DEFAULT '',
+  action VARCHAR(120) DEFAULT '',
+  success TINYINT(1) NOT NULL DEFAULT 0,
+  operatorType VARCHAR(40) DEFAULT '',
+  operatorId VARCHAR(64) DEFAULT '',
+  operatorName VARCHAR(200) DEFAULT '',
+  targetType VARCHAR(80) DEFAULT '',
+  targetId VARCHAR(64) DEFAULT '',
+  message VARCHAR(500) DEFAULT '',
+  errorCode VARCHAR(80) DEFAULT '',
+  metadata JSON NULL,
+  durationMs INT NOT NULL DEFAULT 0,
+  createTime VARCHAR(32) DEFAULT '',
+  INDEX idx_operation_category_time (category, createTime),
+  INDEX idx_operation_operator_time (operatorType, operatorId, createTime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS ai_recognition_jobs (
+  id VARCHAR(64) PRIMARY KEY,
+  ownerId VARCHAR(64) NOT NULL,
+  enterpriseName VARCHAR(200) DEFAULT '',
+  name VARCHAR(255) DEFAULT '',
+  fileType VARCHAR(40) DEFAULT 'image',
+  imageHash VARCHAR(80) DEFAULT '',
+  sourceSize INT NOT NULL DEFAULT 0,
+  imageBase64 LONGTEXT NULL,
+  ocrText LONGTEXT NULL,
+  status VARCHAR(40) DEFAULT 'queued',
+  stage VARCHAR(40) DEFAULT 'queued',
+  progress INT NOT NULL DEFAULT 0,
+  summary VARCHAR(255) DEFAULT '',
+  attempts INT NOT NULL DEFAULT 0,
+  error VARCHAR(255) DEFAULT '',
+  durationMs INT NOT NULL DEFAULT 0,
+  resultJson LONGTEXT NULL,
+  createdAt BIGINT NOT NULL DEFAULT 0,
+  updatedAt BIGINT NOT NULL DEFAULT 0,
+  INDEX idx_ai_job_owner_updated (ownerId, updatedAt),
+  INDEX idx_ai_job_owner_hash (ownerId, imageHash),
+  INDEX idx_ai_job_status_updated (status, updatedAt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
