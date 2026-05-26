@@ -104,3 +104,69 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@media (max-width: 900px) {
+  html,
+  body {
+    font-size: 14px;
+    overscroll-behavior-y: none;
+  }
+
+  .page-header {
+    margin-bottom: 16px;
+
+    .page-title {
+      font-size: 25px;
+      line-height: 1.25;
+    }
+
+    .page-subtitle {
+      margin-top: 7px;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+  }
+
+  .card-shell {
+    border-radius: 20px;
+  }
+
+  .el-button {
+    min-height: 40px;
+  }
+
+  .el-input__wrapper,
+  .el-select__wrapper {
+    min-height: 42px;
+  }
+
+  .el-message-box {
+    width: calc(100vw - 28px) !important;
+    max-width: 420px;
+  }
+
+  .el-dialog {
+    width: calc(100vw - 20px) !important;
+    margin: 10px auto !important;
+    border-radius: 20px;
+  }
+
+  .el-dialog__body {
+    max-height: calc(100dvh - 150px);
+    overflow-y: auto;
+  }
+
+  .el-drawer {
+    width: min(100vw, 560px) !important;
+  }
+
+  .el-table {
+    font-size: 13px;
+  }
+
+  .el-pagination {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+}

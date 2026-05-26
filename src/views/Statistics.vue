@@ -54,7 +54,7 @@
           <el-button link type="primary" @click="goToEnterprises">查看全部</el-button>
         </div>
 
-        <el-table :data="focusEnterprises" stripe @row-click="openEnterpriseDetail">
+        <el-table class="desktop-data-table" :data="focusEnterprises" stripe @row-click="openEnterpriseDetail">
           <el-table-column prop="enterpriseName" label="企业" min-width="180" />
           <el-table-column prop="district" label="辖区" width="100" />
           <el-table-column prop="expiredCount" label="已过期" width="90" />
@@ -65,6 +65,25 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="mobile-focus-list">
+          <button
+            v-for="row in focusEnterprises"
+            :key="row.enterpriseName"
+            type="button"
+            class="mobile-focus-card"
+            @click="openEnterpriseDetail(row)"
+          >
+            <div>
+              <strong>{{ row.enterpriseName || '企业' }}</strong>
+              <span>{{ row.district || '未分配辖区' }}</span>
+            </div>
+            <div class="mobile-risk-row">
+              <em class="danger">{{ row.expiredCount || 0 }} 已过期</em>
+              <em class="warning">{{ row.expiringCount || 0 }} 即将到期</em>
+            </div>
+          </button>
+          <div v-if="!focusEnterprises.length" class="mobile-empty">当前筛选下没有重点企业</div>
+        </div>
       </article>
 
       <article class="panel card-shell">
@@ -378,6 +397,10 @@ onUnmounted(() => {
   }
 }
 
+.mobile-focus-list {
+  display: none;
+}
+
 @media (max-width: 1200px) {
   .filter-panel,
   .summary-grid,
@@ -392,6 +415,73 @@ onUnmounted(() => {
   .content-grid,
   .risk-metric-list {
     grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-focus-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-focus-card {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: rgba(248, 250, 252, 0.9);
+    text-align: left;
+
+    strong {
+      display: block;
+      color: var(--text-main);
+      font-size: 14px;
+    }
+
+    span {
+      display: block;
+      margin-top: 5px;
+      color: var(--text-sub);
+      font-size: 12px;
+    }
+  }
+
+  .mobile-risk-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    em {
+      padding: 6px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    .danger {
+      color: #dc2626;
+      background: rgba(254, 226, 226, 0.85);
+    }
+
+    .warning {
+      color: #d97706;
+      background: rgba(254, 243, 199, 0.85);
+    }
+  }
+
+  .mobile-empty {
+    padding: 20px 0;
+    color: var(--text-sub);
+    text-align: center;
   }
 }
 </style>

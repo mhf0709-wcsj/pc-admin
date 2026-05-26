@@ -74,6 +74,7 @@
       </div>
 
       <el-table
+        class="desktop-data-table"
         v-loading="loading"
         :data="records"
         stripe
@@ -118,6 +119,29 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div v-loading="loading" class="mobile-record-list">
+        <article v-for="row in records" :key="row._id" class="mobile-record-card">
+          <div class="mobile-card-head">
+            <el-checkbox :model-value="isSelected(row)" @change="toggleRecord(row, $event)" />
+            <div class="mobile-card-title" @click="openRecordDetail(row)">
+              <strong>{{ row.certNo || '未填写证书编号' }}</strong>
+              <span>{{ row.enterpriseName || '未填写企业' }}</span>
+            </div>
+            <el-tag :type="getRiskTagType(row)" size="small" effect="light">{{ getRiskLabel(row) }}</el-tag>
+          </div>
+          <div class="mobile-card-grid" @click="openRecordDetail(row)">
+            <div><label>出厂编号</label><span>{{ row.factoryNo || '-' }}</span></div>
+            <div><label>设备名称</label><span>{{ row.equipmentName || '-' }}</span></div>
+            <div><label>辖区</label><span>{{ row.district || '-' }}</span></div>
+            <div><label>检定结论</label><span>{{ row.conclusion || '未知' }}</span></div>
+            <div><label>到期日期</label><span :class="getExpiryClass(row.expiryDate)">{{ row.expiryDate || '-' }}</span></div>
+            <div><label>处置状态</label><span>{{ riskStatusLabel(row.riskStatus) }}</span></div>
+          </div>
+          <el-button type="primary" plain class="mobile-detail-btn" @click="openRecordDetail(row)">查看详情</el-button>
+        </article>
+        <div v-if="!loading && !records.length" class="mobile-empty">没有符合条件的检定记录</div>
+      </div>
 
       <div class="pagination">
         <el-pagination
@@ -245,6 +269,15 @@ function resetFilters() {
 function openRecordDetail(row) {
   selectedRecord.value = row
   detailVisible.value = true
+}
+
+function isSelected(row) {
+  return selectedRows.value.some((item) => item._id === row._id)
+}
+
+function toggleRecord(row, checked) {
+  if (checked && !isSelected(row)) selectedRows.value = [...selectedRows.value, row]
+  if (!checked) selectedRows.value = selectedRows.value.filter((item) => item._id !== row._id)
 }
 
 function handleRecordSaved(record) {
@@ -497,6 +530,10 @@ onMounted(() => {
   font-weight: 700;
 }
 
+.mobile-record-list {
+  display: none;
+}
+
 @media (max-width: 1200px) {
   .toolbar-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -504,6 +541,86 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .toolbar,
+  .table-panel {
+    padding: 16px;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-record-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-record-card {
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 18px;
+    background: rgba(248, 250, 252, 0.82);
+  }
+
+  .mobile-card-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+  }
+
+  .mobile-card-title {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+
+    strong {
+      color: var(--text-main);
+      font-size: 15px;
+    }
+
+    span {
+      color: var(--text-sub);
+      font-size: 12px;
+    }
+  }
+
+  .mobile-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 10px;
+    margin: 14px 0;
+
+    div {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    label {
+      color: var(--text-sub);
+      font-size: 12px;
+    }
+
+    span {
+      overflow: hidden;
+      color: var(--text-main);
+      font-size: 13px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .mobile-detail-btn {
+    width: 100%;
+  }
+
+  .mobile-empty {
+    padding: 26px 12px;
+    text-align: center;
+    color: var(--text-sub);
+  }
+
   .toolbar-grid {
     grid-template-columns: 1fr;
   }

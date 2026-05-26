@@ -35,10 +35,7 @@ export const useUserStore = defineStore('user', () => {
       persist(nextUser, result.token || `web_admin_${Date.now()}`, 'admin')
       return { success: true }
     } catch (error) {
-      return {
-        success: false,
-        message: error.message || '用户名或密码错误'
-      }
+      return { success: false, message: error.message || '用户名或密码错误' }
     }
   }
 
@@ -48,10 +45,7 @@ export const useUserStore = defineStore('user', () => {
       persist(result.enterprise, result.token || `web_enterprise_${Date.now()}`, 'enterprise')
       return { success: true }
     } catch (error) {
-      return {
-        success: false,
-        message: error.message || '企业登录失败'
-      }
+      return { success: false, message: error.message || '企业登录失败' }
     }
   }
 
@@ -61,10 +55,7 @@ export const useUserStore = defineStore('user', () => {
       persist(result.enterprise, result.token || `web_enterprise_${Date.now()}`, 'enterprise')
       return { success: true }
     } catch (error) {
-      return {
-        success: false,
-        message: error.message || '企业注册失败'
-      }
+      return { success: false, message: error.message || '企业注册失败' }
     }
   }
 
@@ -103,10 +94,7 @@ export const useUserStore = defineStore('user', () => {
       await changeAdminPassword(user.value, oldPassword, newPassword)
       return { success: true }
     } catch (error) {
-      return {
-        success: false,
-        message: error.message || '密码修改失败'
-      }
+      return { success: false, message: error.message || '密码修改失败' }
     }
   }
 

@@ -9,6 +9,12 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/Register.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     meta: { requiresAuth: true },
@@ -98,7 +104,7 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  if (to.path === '/login' && userStore.isLoggedIn) {
+  if ((to.path === '/login' || to.path === '/register') && userStore.isLoggedIn) {
     next(userStore.isEnterprise ? '/enterprise/ai' : '/dashboard')
     return
   }

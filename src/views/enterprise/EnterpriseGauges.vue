@@ -36,7 +36,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="压力表" name="gauges">
-          <el-table :data="gauges" stripe>
+          <el-table class="desktop-data-table" :data="gauges" stripe>
             <el-table-column prop="deviceName" label="压力表名称" min-width="150" />
             <el-table-column prop="deviceNo" label="压力表编号" min-width="150" />
             <el-table-column prop="factoryNo" label="出厂编号" min-width="130" />
@@ -51,10 +51,30 @@
               </template>
             </el-table-column>
           </el-table>
+          <div class="mobile-gauge-list">
+            <article v-for="row in gauges" :key="row._id || row.deviceNo" class="mobile-gauge-card">
+              <div class="mobile-gauge-head">
+                <div>
+                  <h3>{{ row.deviceName || '压力表' }}</h3>
+                  <p>{{ row.deviceNo || row.factoryNo || '未填写编号' }}</p>
+                </div>
+                <el-tag :type="row.status === '在用' ? 'success' : 'info'" size="small">
+                  {{ row.status || '-' }}
+                </el-tag>
+              </div>
+              <div class="mobile-field-grid">
+                <div><span>出厂编号</span><strong>{{ row.factoryNo || '-' }}</strong></div>
+                <div><span>所属设备</span><strong>{{ row.equipmentName || '-' }}</strong></div>
+                <div><span>安装位置</span><strong>{{ row.installLocation || '未填写' }}</strong></div>
+                <div><span>型号规格</span><strong>{{ row.modelSpec || '-' }}</strong></div>
+              </div>
+            </article>
+            <div v-if="!gauges.length" class="mobile-empty">暂无压力表台账</div>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="检定记录" name="records">
-          <el-table :data="records" stripe>
+          <el-table class="desktop-data-table" :data="records" stripe>
             <el-table-column prop="certNo" label="证书编号" min-width="150" />
             <el-table-column prop="factoryNo" label="出厂编号" min-width="130" />
             <el-table-column prop="instrumentName" label="仪表名称" min-width="140" />
@@ -110,6 +130,44 @@
               </template>
             </el-table-column>
           </el-table>
+          <div class="mobile-gauge-list">
+            <article v-for="row in records" :key="row._id" class="mobile-gauge-card record">
+              <div class="mobile-gauge-head">
+                <div>
+                  <h3>{{ row.certNo || '未填写证书编号' }}</h3>
+                  <p>{{ row.instrumentName || row.factoryNo || '检定记录' }}</p>
+                </div>
+                <el-tag :type="row.conclusion === '合格' ? 'success' : 'danger'" size="small">
+                  {{ row.conclusion || '-' }}
+                </el-tag>
+              </div>
+              <div class="mobile-field-grid">
+                <div><span>所属设备</span><strong>{{ row.equipmentName || '-' }}</strong></div>
+                <div><span>到期日期</span><strong>{{ row.expiryDate || '-' }}</strong></div>
+                <div class="wide"><span>安装位置</span><strong>{{ row.installLocation || '未填写' }}</strong></div>
+              </div>
+              <div class="mobile-evidence">
+                <el-tag :type="row.hasImage ? 'success' : 'danger'" size="small">
+                  {{ row.hasImage ? '证书已存' : '缺证书' }}
+                </el-tag>
+                <el-tag :type="row.hasInstallPhoto ? 'success' : 'warning'" size="small">
+                  {{ row.hasInstallPhoto ? '现场已存' : '缺现场照' }}
+                </el-tag>
+                <el-button v-if="row.installPhotoFileID" type="primary" text @click="previewPhoto(row)">查看照片</el-button>
+              </div>
+              <div class="mobile-remediation">
+                <el-select v-model="row.remediationStatus" placeholder="处置状态">
+                  <el-option label="待处理" value="pending" />
+                  <el-option label="已通知" value="notified" />
+                  <el-option label="已上传复检材料" value="rechecked" />
+                  <el-option label="已关闭" value="closed" />
+                </el-select>
+                <el-input v-model="row.remediationNote" placeholder="处置备注" />
+                <el-button type="primary" :loading="savingId === row._id" @click="saveRemediation(row)">保存处置</el-button>
+              </div>
+            </article>
+            <div v-if="!records.length" class="mobile-empty">暂无检定记录</div>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </section>
@@ -229,12 +287,112 @@ onMounted(loadData)
   object-fit: contain;
 }
 
+.mobile-gauge-list {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .toolbar,
   .remediation-cell {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .table-panel {
+    padding: 16px;
+  }
+
+  .toolbar .el-input,
+  .toolbar .el-select {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-gauge-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-gauge-card {
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 18px;
+    background: rgba(248, 250, 252, 0.9);
+  }
+
+  .mobile-gauge-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+
+    h3 {
+      font-size: 15px;
+      color: var(--text-main);
+    }
+
+    p {
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+  }
+
+  .mobile-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 10px;
+
+    div {
+      min-width: 0;
+      display: grid;
+      gap: 5px;
+    }
+
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    span {
+      color: var(--text-sub);
+      font-size: 12px;
+    }
+
+    strong {
+      overflow: hidden;
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .mobile-evidence {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+  }
+
+  .mobile-remediation {
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(148, 163, 184, 0.25);
+  }
+
+  .mobile-empty {
+    padding: 24px 0;
+    text-align: center;
+    color: var(--text-sub);
   }
 }
 </style>

@@ -67,7 +67,7 @@
           </div>
           <el-button type="primary" link @click="$router.push('/enterprise/gauges')">进入台账处理</el-button>
         </div>
-        <el-table :data="dashboard.todos" stripe>
+        <el-table class="desktop-data-table" :data="dashboard.todos" stripe>
           <el-table-column prop="todoReason" label="待办原因" min-width="120">
             <template #default="{ row }">
               <el-tag :type="row.priority === 'high' ? 'danger' : 'warning'" size="small">
@@ -84,6 +84,17 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="mobile-work-list">
+          <article v-for="row in dashboard.todos" :key="row._id || row.certNo" class="mobile-work-card danger">
+            <div class="mobile-work-head">
+              <strong>{{ row.certNo || '待处理记录' }}</strong>
+              <el-tag :type="row.priority === 'high' ? 'danger' : 'warning'" size="small">{{ row.todoReason }}</el-tag>
+            </div>
+            <p>{{ row.equipmentName || '未绑定设备' }} · {{ row.expiryDate || '未填写到期日期' }}</p>
+            <span>{{ formatRemediationStatus(row.remediationStatus) }}</span>
+          </article>
+          <div v-if="!dashboard.todos.length" class="mobile-empty">当前没有待处理事项</div>
+        </div>
       </article>
 
       <article class="panel card-shell">
@@ -94,7 +105,7 @@
           </div>
           <el-button type="primary" link @click="$router.push('/enterprise/ai')">进入 AI 管家</el-button>
         </div>
-        <el-table :data="dashboard.recentTasks" stripe>
+        <el-table class="desktop-data-table" :data="dashboard.recentTasks" stripe>
           <el-table-column prop="name" label="任务" min-width="180" />
           <el-table-column prop="fileType" label="类型" width="90" />
           <el-table-column prop="progress" label="进度" width="110">
@@ -106,6 +117,17 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="mobile-work-list">
+          <article v-for="row in dashboard.recentTasks" :key="row.id || row.jobId || row.name" class="mobile-work-card">
+            <div class="mobile-work-head">
+              <strong>{{ row.name || '识别任务' }}</strong>
+              <el-tag :type="taskTagType(row.status)" size="small">{{ taskStatusText(row.status) }}</el-tag>
+            </div>
+            <p>{{ row.fileType || '文件' }}</p>
+            <el-progress :percentage="row.progress || 0" :stroke-width="7" />
+          </article>
+          <div v-if="!dashboard.recentTasks.length" class="mobile-empty">暂无最近识别任务</div>
+        </div>
       </article>
     </section>
 
@@ -117,7 +139,7 @@
         </div>
         <el-button type="primary" link @click="$router.push('/enterprise/gauges')">查看压力表</el-button>
       </div>
-      <el-table :data="dashboard.recentRecords" stripe>
+      <el-table class="desktop-data-table" :data="dashboard.recentRecords" stripe>
         <el-table-column prop="certNo" label="证书编号" min-width="140" />
         <el-table-column prop="factoryNo" label="出厂编号" min-width="120" />
         <el-table-column prop="instrumentName" label="仪表名称" min-width="140" />
@@ -128,6 +150,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="mobile-work-list">
+        <article v-for="row in dashboard.recentRecords" :key="row._id || row.certNo" class="mobile-work-card">
+          <div class="mobile-work-head">
+            <strong>{{ row.certNo || '检定记录' }}</strong>
+            <el-tag :type="row.isExpired ? 'danger' : 'info'" size="small">{{ row.expiryDate || '-' }}</el-tag>
+          </div>
+          <p>{{ row.instrumentName || '压力表' }} · {{ row.equipmentName || '未绑定设备' }}</p>
+          <span>出厂编号：{{ row.factoryNo || '-' }}</span>
+        </article>
+        <div v-if="!dashboard.recentRecords.length" class="mobile-empty">暂无最近保存记录</div>
+      </div>
     </section>
   </div>
 </template>
@@ -361,6 +394,10 @@ onMounted(loadData)
   background: rgba(248, 250, 252, 0.8);
 }
 
+.mobile-work-list {
+  display: none;
+}
+
 @media (max-width: 1180px) {
   .summary-grid,
   .content-grid {
@@ -383,6 +420,58 @@ onMounted(loadData)
   .calendar-filters .el-select,
   .calendar-filters .el-input {
     width: 100%;
+  }
+
+  .calendar-panel,
+  .panel {
+    padding: 16px;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-work-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-work-card {
+    display: grid;
+    gap: 9px;
+    padding: 13px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: rgba(248, 250, 252, 0.9);
+
+    &.danger {
+      border-color: rgba(239, 68, 68, 0.18);
+      background: rgba(254, 242, 242, 0.72);
+    }
+
+    p,
+    span {
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+  }
+
+  .mobile-work-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+
+    strong {
+      color: var(--text-main);
+      font-size: 14px;
+    }
+  }
+
+  .mobile-empty {
+    padding: 22px 0;
+    text-align: center;
+    color: var(--text-sub);
   }
 }
 </style>

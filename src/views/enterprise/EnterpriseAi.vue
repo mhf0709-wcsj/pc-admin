@@ -3611,6 +3611,105 @@ onMounted(async () => {
   }
 }
 
+@media (max-width: 768px) {
+  .chat-panel,
+  .draft-panel {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .ai-layout {
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .chat-toolbar,
+  .draft-head,
+  .queue-head,
+  .job-detail-hero,
+  .draft-card-head,
+  .draft-actions,
+  .conflict-head,
+  .conflict-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions,
+  .job-detail-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    :deep(.el-button) {
+      margin-left: 0;
+      width: 100%;
+    }
+  }
+
+  .queue-head-side,
+  .queue-card-tools {
+    justify-content: flex-start;
+  }
+
+  .queue-card {
+    grid-template-columns: 52px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .queue-preview {
+    width: 52px;
+    height: 52px;
+  }
+
+  .message-list {
+    min-height: 260px;
+  }
+
+  .message-row {
+    gap: 8px;
+  }
+
+  .message-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+
+  .avatar-svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .message-stack {
+    max-width: calc(100% - 44px);
+  }
+
+  .message-bubble {
+    padding: 12px 13px;
+    border-radius: 18px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .draft-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .history-panel,
+  .queue-panel,
+  .conflict-desk {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .history-card {
+    padding: 12px;
+  }
+}
+
 @keyframes pulse-step {
   0%,
   100% {

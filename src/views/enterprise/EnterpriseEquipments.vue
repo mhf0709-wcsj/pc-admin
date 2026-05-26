@@ -13,7 +13,7 @@
         <el-input v-model="keyword" clearable placeholder="搜索设备名称、编号或位置" @keyup.enter="loadData" />
         <el-button type="primary" @click="loadData">搜索</el-button>
       </div>
-      <el-table :data="list" stripe>
+      <el-table class="desktop-data-table" :data="list" stripe>
         <el-table-column prop="equipmentName" label="设备名称" min-width="160" />
         <el-table-column prop="equipmentNo" label="设备编号" min-width="140" />
         <el-table-column prop="location" label="安装位置" min-width="160" />
@@ -26,6 +26,29 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-device-list">
+        <article v-for="row in list" :key="row._id" class="mobile-device-card">
+          <div class="mobile-device-head">
+            <div>
+              <h3>{{ row.equipmentName || '未命名设备' }}</h3>
+              <p>{{ row.equipmentNo || '暂无设备编号' }}</p>
+            </div>
+            <el-tag type="info" effect="plain">{{ row.gaugeCount || 0 }} 块表</el-tag>
+          </div>
+          <div class="mobile-device-info">
+            <span>安装位置</span>
+            <strong>{{ row.location || '未填写' }}</strong>
+            <span>创建时间</span>
+            <strong>{{ row.createTime || '-' }}</strong>
+          </div>
+          <div class="mobile-device-actions">
+            <el-button type="primary" plain @click="openEdit(row)">编辑</el-button>
+            <el-button type="danger" plain @click="remove(row)">删除</el-button>
+          </div>
+        </article>
+        <div v-if="!list.length" class="mobile-empty">暂无设备台账</div>
+      </div>
     </section>
 
     <el-dialog v-model="dialogVisible" :title="form._id ? '编辑设备' : '新建设备'" width="520px">
@@ -146,11 +169,88 @@ onMounted(loadData)
   }
 }
 
+.mobile-device-list {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .action-header,
   .toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .table-panel {
+    padding: 16px;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-device-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-device-card {
+    padding: 15px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 18px;
+    background: rgba(248, 250, 252, 0.88);
+  }
+
+  .mobile-device-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
+    h3 {
+      font-size: 16px;
+      color: var(--text-main);
+    }
+
+    p {
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+  }
+
+  .mobile-device-info {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 12px;
+    margin: 15px 0;
+    font-size: 13px;
+
+    span {
+      color: var(--text-sub);
+    }
+
+    strong {
+      color: var(--text-main);
+      font-weight: 500;
+      text-align: right;
+    }
+  }
+
+  .mobile-device-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+
+    .el-button {
+      width: 100%;
+      margin-left: 0;
+    }
+  }
+
+  .mobile-empty {
+    padding: 24px 0;
+    text-align: center;
+    color: var(--text-sub);
   }
 }
 </style>

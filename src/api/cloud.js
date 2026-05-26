@@ -5,10 +5,35 @@ import { cloudConfig, collections } from './config'
 let app
 let auth
 let authPromise
+let redirectingForSessionExpiry = false
 
 function getServerToken() {
   if (typeof localStorage === 'undefined') return ''
   return localStorage.getItem('webToken') || localStorage.getItem('adminToken') || ''
+}
+
+function clearStoredSession() {
+  if (typeof localStorage === 'undefined') return
+  localStorage.removeItem('webUser')
+  localStorage.removeItem('webToken')
+  localStorage.removeItem('webUserType')
+  localStorage.removeItem('adminUser')
+  localStorage.removeItem('adminToken')
+}
+
+function handleExpiredSession(error) {
+  if (typeof window === 'undefined' || !getServerToken()) return
+  const status = error?.response?.status
+  const message = String(error?.response?.data?.message || error?.response?.data?.error || error?.message || '')
+  const isExpired = status === 401 || /jwt expired|token expired|unauthorized|未登录|登录已过期|令牌已过期/i.test(message)
+  const onPublicPage = window.location.pathname === '/login' || window.location.pathname === '/register'
+
+  if (!isExpired || onPublicPage || redirectingForSessionExpiry) return
+
+  redirectingForSessionExpiry = true
+  clearStoredSession()
+  const redirect = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+  window.location.replace(`/login?expired=1&redirect=${redirect}`)
 }
 
 function normalizeHttpError(error, fallbackMessage) {
@@ -41,6 +66,7 @@ async function postServer(path, data = {}, requestOptions = {}) {
     })
     return response.data || {}
   } catch (error) {
+    handleExpiredSession(error)
     throw normalizeHttpError(error, '网络请求失败，请稍后重试')
   }
 }

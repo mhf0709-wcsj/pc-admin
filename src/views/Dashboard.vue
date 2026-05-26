@@ -88,7 +88,7 @@
           <el-button type="primary" link @click="goToRecords">进入台账中心</el-button>
         </div>
 
-        <el-table :data="dashboard.recentRecords" stripe @row-click="openRecordDetail">
+        <el-table class="desktop-data-table" :data="dashboard.recentRecords" stripe @row-click="openRecordDetail">
           <el-table-column prop="certNo" label="证书编号" min-width="150" />
           <el-table-column prop="factoryNo" label="出厂编号" min-width="120" />
           <el-table-column prop="enterpriseName" label="企业" min-width="180" />
@@ -102,6 +102,28 @@
           </el-table-column>
           <el-table-column prop="expiryDate" label="到期日期" width="120" />
         </el-table>
+        <div class="mobile-dashboard-list">
+          <button
+            v-for="row in dashboard.recentRecords"
+            :key="row._id || row.certNo"
+            type="button"
+            class="mobile-dashboard-card"
+            @click="openRecordDetail(row)"
+          >
+            <div class="mobile-dashboard-head">
+              <strong>{{ row.certNo || '检定记录' }}</strong>
+              <el-tag :type="row.conclusion === '合格' ? 'success' : 'danger'" size="small">
+                {{ row.conclusion || '未知' }}
+              </el-tag>
+            </div>
+            <p>{{ row.enterpriseName || '未填写企业' }} · {{ row.district || '未分配辖区' }}</p>
+            <div class="mobile-dashboard-meta">
+              <span>出厂编号：{{ row.factoryNo || '-' }}</span>
+              <span>到期日期：{{ row.expiryDate || '-' }}</span>
+            </div>
+          </button>
+          <div v-if="!dashboard.recentRecords.length" class="mobile-empty">暂无最近检定记录</div>
+        </div>
       </article>
     </section>
 
@@ -128,7 +150,7 @@
         当前可见范围内有 {{ dashboard.reminders.length }} 条压力表将在 30 天内到期，建议优先跟进。
       </div>
 
-      <el-table :data="dashboard.reminders" stripe>
+      <el-table class="desktop-data-table" :data="dashboard.reminders" stripe>
         <el-table-column prop="enterpriseName" label="企业" min-width="180" />
         <el-table-column prop="instrumentName" label="仪表名称" min-width="150" />
         <el-table-column prop="certNo" label="证书编号" min-width="150" />
@@ -147,6 +169,19 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="mobile-dashboard-list reminder-list">
+        <article v-for="row in dashboard.reminders" :key="row._id || row.certNo" class="mobile-dashboard-card">
+          <div class="mobile-dashboard-head">
+            <strong>{{ row.certNo || '到期提醒' }}</strong>
+            <el-tag type="warning" size="small">{{ row.statusLabel || '待提醒' }}</el-tag>
+          </div>
+          <p>{{ row.enterpriseName || '-' }} · {{ row.instrumentName || '压力表' }}</p>
+          <div class="mobile-dashboard-meta"><span>到期日期：{{ row.expiryDate || '-' }}</span></div>
+          <el-button link type="primary" :disabled="!row.phone" @click="triggerSmsReminder(row)">
+            {{ row.phone ? '预留短信接口' : '未留手机号' }}
+          </el-button>
+        </article>
+      </div>
 
       <template #footer>
         <el-button @click="dismissReminderDialog">我知道了</el-button>
@@ -475,6 +510,10 @@ onUnmounted(() => {
   line-height: 1.7;
 }
 
+.mobile-dashboard-list {
+  display: none;
+}
+
 @media (max-width: 1200px) {
   .summary-grid,
   .content-grid {
@@ -490,6 +529,67 @@ onUnmounted(() => {
 
   .focus-main {
     flex-direction: column;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .panel-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-dashboard-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-dashboard-card {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.17);
+    border-radius: 17px;
+    background: rgba(248, 250, 252, 0.9);
+    color: inherit;
+    text-align: left;
+
+    p {
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+  }
+
+  .mobile-dashboard-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
+    strong {
+      color: var(--text-main);
+      font-size: 14px;
+    }
+  }
+
+  .mobile-dashboard-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    color: var(--text-sub);
+    font-size: 12px;
+  }
+
+  .mobile-empty {
+    padding: 22px 0;
+    text-align: center;
+    color: var(--text-sub);
   }
 }
 </style>
