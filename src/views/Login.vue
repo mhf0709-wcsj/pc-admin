@@ -52,7 +52,7 @@
         <el-button type="primary" size="large" :loading="loading" class="auth-btn" @click="handleAdminLogin">
           登录监管端
         </el-button>
-        <div class="help-text">本地调试默认账号：admin / admin123</div>
+        <div v-if="showDebugHint" class="help-text">本地调试默认账号：admin / admin123</div>
       </el-form>
 
       <el-form
@@ -101,6 +101,7 @@ const userStore = useUserStore()
 
 const activeTab = ref('admin')
 const loading = ref(false)
+const showDebugHint = import.meta.env.DEV
 const adminFormRef = ref()
 const enterpriseFormRef = ref()
 const sessionExpired = computed(() => route.query.expired === '1')

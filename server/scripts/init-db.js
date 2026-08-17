@@ -198,6 +198,9 @@ async function initMysql() {
 async function initSqlite() {
   fs.mkdirSync(path.dirname(config.sqlite.path), { recursive: true })
   const db = new DatabaseSync(config.sqlite.path)
+  // 强制 DELETE（回滚日志）模式，避免 Windows + node:sqlite 在 WAL 下出现
+  // "attempt to write a readonly database"。DELETE 在 Windows/Linux 均稳定。
+  db.exec('PRAGMA journal_mode = DELETE;')
 
   try {
     const schemaSql = fs.readFileSync(path.resolve(__dirname, '../sql/schema.sqlite.sql'), 'utf8')

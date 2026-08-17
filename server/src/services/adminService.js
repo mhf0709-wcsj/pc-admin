@@ -620,7 +620,6 @@ async function handleGetDashboard(payload = {}, session) {
     }, new Map()).entries()).map(([name, value]) => ({ name, value })),
     enterpriseOptions: Array.from(new Set(records.map((item) => item.enterpriseName).filter(Boolean))).sort(),
     focusEnterprises,
-    todos: todos.slice(0, 20),
     calendarItems: reminders.map((item) => ({
       ...item,
       recordId: item.recordId || item.id || '',

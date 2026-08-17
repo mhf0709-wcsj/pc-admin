@@ -194,11 +194,16 @@
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
+import * as echarts from 'echarts/core'
+import { PieChart } from 'echarts/charts'
+import { TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { getDashboardData, sendReminderSms } from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 import EnterpriseDetailDrawer from '@/components/EnterpriseDetailDrawer.vue'
 import RecordDetailDrawer from '@/components/RecordDetailDrawer.vue'
+
+echarts.use([PieChart, TooltipComponent, CanvasRenderer])
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -212,6 +217,7 @@ const selectedEnterprise = ref(null)
 const selectedRecord = ref(null)
 let districtChart = null
 let conclusionChart = null
+let resizeObservers = []
 
 const dashboard = reactive({
   summary: {
@@ -266,7 +272,7 @@ async function loadDashboard() {
   dashboard.conclusionStats = result.conclusionStats || []
   dashboard.reminders = result.reminders || []
   await nextTick()
-  initCharts()
+  safeRenderCharts()
   maybeOpenReminderDialog()
 }
 
@@ -318,6 +324,30 @@ function handleResize() {
   conclusionChart?.resize()
 }
 
+// 容器宽度为 0（移动端布局未完成、display 切换等）时延迟重试，避免图表渲染为空白
+function safeRenderCharts() {
+  const ready =
+    districtChartRef.value?.clientWidth > 0 ||
+    conclusionChartRef.value?.clientWidth > 0
+  if (!ready) {
+    requestAnimationFrame(safeRenderCharts)
+    return
+  }
+  initCharts()
+}
+
+function observeResize() {
+  const targets = [districtChartRef.value, conclusionChartRef.value].filter(Boolean)
+  targets.forEach((el) => {
+    const ro = new ResizeObserver(() => {
+      districtChart?.resize()
+      conclusionChart?.resize()
+    })
+    ro.observe(el)
+    resizeObservers.push(ro)
+  })
+}
+
 function openEnterpriseDetail(item) {
   selectedEnterprise.value = item
   enterpriseDrawerVisible.value = true
@@ -355,11 +385,12 @@ function goToEnterpriseRiskRecords(enterpriseName) {
 
 onMounted(async () => {
   await loadDashboard()
-  window.addEventListener('resize', handleResize)
+  observeResize()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
+  resizeObservers.forEach((ro) => ro.disconnect())
+  resizeObservers = []
   districtChart?.dispose()
   conclusionChart?.dispose()
 })

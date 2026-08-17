@@ -15,7 +15,9 @@ function ensureSqliteDb() {
   fs.mkdirSync(path.dirname(config.sqlite.path), { recursive: true })
   sqliteDb = new DatabaseSync(config.sqlite.path)
   sqliteDb.exec('PRAGMA foreign_keys = ON;')
-  sqliteDb.exec('PRAGMA journal_mode = WAL;')
+  // 使用 DELETE（回滚日志）模式而非 WAL：WAL 在 Windows + node:sqlite 下会因
+  // 写锁问题导致 "attempt to write a readonly database"，DELETE 模式在 Windows/Linux 均正常。
+  sqliteDb.exec('PRAGMA journal_mode = DELETE;')
   return sqliteDb
 }
 

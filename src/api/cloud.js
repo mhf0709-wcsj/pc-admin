@@ -1,7 +1,7 @@
-import cloudbase from '@cloudbase/js-sdk'
 import axios from 'axios'
 import { cloudConfig, collections } from './config'
 
+let cloudbase
 let app
 let auth
 let authPromise
@@ -71,7 +71,12 @@ async function postServer(path, data = {}, requestOptions = {}) {
   }
 }
 
-function getCloudApp() {
+// 仅在未配置 apiBaseUrl（使用云开发环境）时才动态加载 CloudBase SDK，
+// 避免本地/独立后端模式下 SDK 初始化异常（如 Cannot read properties of null (reading 'scope')）
+async function getCloudApp() {
+  if (!cloudbase) {
+    cloudbase = (await import('@cloudbase/js-sdk')).default
+  }
   if (!app) {
     app = cloudbase.init({
       env: cloudConfig.envId
@@ -80,9 +85,9 @@ function getCloudApp() {
   return app
 }
 
-function getAuth() {
+async function getAuth() {
   if (!auth) {
-    auth = getCloudApp().auth({
+    auth = (await getCloudApp()).auth({
       persistence: 'local'
     })
   }
@@ -90,12 +95,21 @@ function getAuth() {
 }
 
 export async function ensureCloudReady() {
+  // 当配置了 apiBaseUrl 时，所有调用走 HTTP，无需初始化 CloudBase
+  if (cloudConfig.apiBaseUrl) return true
+
   if (!authPromise) {
     authPromise = (async () => {
-      const authInstance = getAuth()
-      const loginState = await authInstance.getLoginState()
-      if (!loginState) {
-        await authInstance.signInAnonymously()
+      try {
+        const authInstance = await getAuth()
+        if (!authInstance) return false
+        const loginState = await authInstance.getLoginState()
+        if (!loginState) {
+          await authInstance.signInAnonymously()
+        }
+      } catch (e) {
+        console.warn('CloudBase 初始化失败（非致命）:', e.message || e)
+        return false
       }
       return true
     })()
@@ -105,7 +119,8 @@ export async function ensureCloudReady() {
 
 export async function callCloudFunction(name, data = {}) {
   await ensureCloudReady()
-  return getCloudApp().callFunction({
+  const cloudApp = await getCloudApp()
+  return cloudApp.callFunction({
     name,
     data
   })
@@ -169,7 +184,8 @@ export async function callOcrFunction(payload = {}, requestOptions = {}) {
 
 export async function uploadCloudFile(file, cloudPath) {
   await ensureCloudReady()
-  const result = await getCloudApp().uploadFile({
+  const cloudApp = await getCloudApp()
+  const result = await cloudApp.uploadFile({
     cloudPath,
     filePath: file
   })

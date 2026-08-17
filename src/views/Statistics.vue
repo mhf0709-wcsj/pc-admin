@@ -115,11 +115,16 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import * as echarts from 'echarts'
+import * as echarts from 'echarts/core'
+import { BarChart, PieChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { districts } from '@/api/config'
 import { getDashboardData } from '@/api/regulator'
 import { useUserStore } from '@/stores/user'
 import EnterpriseDetailDrawer from '@/components/EnterpriseDetailDrawer.vue'
+
+echarts.use([BarChart, PieChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -131,6 +136,7 @@ const selectedEnterprise = ref(null)
 const loading = ref(false)
 let districtChart = null
 let riskStatusChart = null
+let resizeObservers = []
 
 const filters = reactive({
   district: '',
@@ -179,7 +185,7 @@ async function loadStatistics() {
     focusEnterprises.value = result.focusEnterprises || []
     enterpriseOptions.value = result.enterpriseOptions || []
     await nextTick()
-    initCharts()
+    safeRenderCharts()
   } finally {
     loading.value = false
   }
@@ -203,41 +209,78 @@ function riskStatusLabel(value) {
   }[value || 'pending'] || '未处理'
 }
 
-function initCharts() {
-  if (districtChartRef.value) {
-    districtChart?.dispose()
-    districtChart = echarts.init(districtChartRef.value)
-    districtChart.setOption({
-      tooltip: { trigger: 'axis' },
-      grid: { left: 40, right: 20, top: 30, bottom: 30 },
-      xAxis: { type: 'category', data: districtStats.value.map((item) => item.name), axisLabel: { color: '#64748b' } },
-      yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.16)' } } },
-      series: [{ type: 'bar', data: districtStats.value.map((item) => item.value), barMaxWidth: 34, itemStyle: { borderRadius: [10, 10, 0, 0], color: '#3b82f6' } }]
-    })
-  }
+function createChart(refEl, buildOption) {
+  if (!refEl) return null
+  const chart = echarts.init(refEl)
+  chart.setOption(buildOption())
+  return chart
+}
 
-  if (riskStatusChartRef.value) {
-    riskStatusChart?.dispose()
-    riskStatusChart = echarts.init(riskStatusChartRef.value)
-    riskStatusChart.setOption({
-      tooltip: { trigger: 'item' },
-      series: [{
-        type: 'pie',
-        radius: ['46%', '72%'],
-        label: { formatter: '{b} {d}%' },
-        itemStyle: { borderColor: '#fff', borderWidth: 4 },
-        data: riskStatusStats.value.map((item) => ({
-          name: riskStatusLabel(item.name),
-          value: item.value
-        }))
-      }]
-    })
+function buildDistrictOption() {
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 20, top: 30, bottom: 30 },
+    xAxis: { type: 'category', data: districtStats.value.map((item) => item.name), axisLabel: { color: '#64748b' } },
+    yAxis: { type: 'value', axisLabel: { color: '#64748b' }, splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.16)' } } },
+    series: [{ type: 'bar', data: districtStats.value.map((item) => item.value), barMaxWidth: 34, itemStyle: { borderRadius: [10, 10, 0, 0], color: '#3b82f6' } }]
   }
 }
 
-function handleResize() {
-  districtChart?.resize()
-  riskStatusChart?.resize()
+function buildRiskStatusOption() {
+  return {
+    tooltip: { trigger: 'item' },
+    series: [{
+      type: 'pie',
+      radius: ['46%', '72%'],
+      label: { formatter: '{b} {d}%' },
+      itemStyle: { borderColor: '#fff', borderWidth: 4 },
+      data: riskStatusStats.value.map((item) => ({
+        name: riskStatusLabel(item.name),
+        value: item.value
+      }))
+    }]
+  }
+}
+
+function renderCharts() {
+  if (districtChartRef.value) {
+    districtChart?.dispose()
+    districtChart = createChart(districtChartRef.value, buildDistrictOption)
+  }
+  if (riskStatusChartRef.value) {
+    riskStatusChart?.dispose()
+    riskStatusChart = createChart(riskStatusChartRef.value, buildRiskStatusOption)
+  }
+  updateCharts()
+}
+
+function updateCharts() {
+  districtChart?.setOption(buildDistrictOption())
+  riskStatusChart?.setOption(buildRiskStatusOption())
+}
+
+// 容器宽度为 0（移动端布局未完成、display 切换等）时延迟重试，避免图表渲染为空白
+function safeRenderCharts() {
+  const ready =
+    districtChartRef.value?.clientWidth > 0 ||
+    riskStatusChartRef.value?.clientWidth > 0
+  if (!ready) {
+    requestAnimationFrame(safeRenderCharts)
+    return
+  }
+  renderCharts()
+}
+
+function observeResize() {
+  const targets = [districtChartRef.value, riskStatusChartRef.value].filter(Boolean)
+  targets.forEach((el) => {
+    const ro = new ResizeObserver(() => {
+      districtChart?.resize()
+      riskStatusChart?.resize()
+    })
+    ro.observe(el)
+    resizeObservers.push(ro)
+  })
 }
 
 function openEnterpriseDetail(row) {
@@ -259,11 +302,12 @@ function goToEnterpriseRecords(enterpriseName) {
 
 onMounted(async () => {
   await loadStatistics()
-  window.addEventListener('resize', handleResize)
+  observeResize()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
+  resizeObservers.forEach((ro) => ro.disconnect())
+  resizeObservers = []
   districtChart?.dispose()
   riskStatusChart?.dispose()
 })
