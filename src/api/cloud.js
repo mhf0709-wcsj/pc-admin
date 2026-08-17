@@ -7,11 +7,6 @@ let auth
 let authPromise
 let redirectingForSessionExpiry = false
 
-function getServerToken() {
-  if (typeof localStorage === 'undefined') return ''
-  return localStorage.getItem('webToken') || localStorage.getItem('adminToken') || ''
-}
-
 function clearStoredSession() {
   if (typeof localStorage === 'undefined') return
   localStorage.removeItem('webUser')
@@ -22,7 +17,7 @@ function clearStoredSession() {
 }
 
 function handleExpiredSession(error) {
-  if (typeof window === 'undefined' || !getServerToken()) return
+  if (typeof window === 'undefined') return
   const status = error?.response?.status
   const message = String(error?.response?.data?.message || error?.response?.data?.error || error?.message || '')
   const isExpired = status === 401 || /jwt expired|token expired|unauthorized|未登录|登录已过期|令牌已过期/i.test(message)
@@ -32,6 +27,12 @@ function handleExpiredSession(error) {
 
   redirectingForSessionExpiry = true
   clearStoredSession()
+  if (cloudConfig.apiBaseUrl) {
+    fetch(`${String(cloudConfig.apiBaseUrl).replace(/\/$/, '')}/api/session/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    }).catch(() => {})
+  }
   const redirect = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
   window.location.replace(`/login?expired=1&redirect=${redirect}`)
 }
@@ -60,14 +61,33 @@ async function postServer(path, data = {}, requestOptions = {}) {
     const response = await axios.post(`${baseUrl}${path}`, data, {
       timeout: requestOptions.timeout ?? 60000,
       signal: requestOptions.signal,
-      headers: getServerToken()
-        ? { Authorization: `Bearer ${getServerToken()}` }
-        : {}
+      withCredentials: true
     })
     return response.data || {}
   } catch (error) {
     handleExpiredSession(error)
     throw normalizeHttpError(error, '网络请求失败，请稍后重试')
+  }
+}
+
+export async function getServerSession() {
+  const baseUrl = String(cloudConfig.apiBaseUrl || '').replace(/\/$/, '')
+  if (!baseUrl) return null
+  try {
+    const response = await axios.get(`${baseUrl}/api/session`, { timeout: 10000, withCredentials: true })
+    return response.data?.success ? response.data : null
+  } catch {
+    return null
+  }
+}
+
+export async function logoutServerSession() {
+  const baseUrl = String(cloudConfig.apiBaseUrl || '').replace(/\/$/, '')
+  if (!baseUrl) return
+  try {
+    await axios.post(`${baseUrl}/api/session/logout`, {}, { timeout: 10000, withCredentials: true })
+  } catch {
+    // The local session is cleared even when the network is unavailable.
   }
 }
 

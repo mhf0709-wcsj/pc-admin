@@ -188,6 +188,7 @@ async function requestOcr(baseUrl, token, imageBase64, options = {}) {
     try {
       const response = await fetch(`${String(baseUrl).replace(/\/$/, '')}/api/ocr/call`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})

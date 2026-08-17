@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { changeAdminPassword, loginAdmin, loginEnterprise, registerEnterprise } from '@/api/regulator'
+import { getServerSession, logoutServerSession } from '@/api/cloud'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref(null)
@@ -14,12 +15,11 @@ export const useUserStore = defineStore('user', () => {
   const isDistrictAdmin = computed(() => isRegulator.value && user.value?.role === 'district')
   const adminDistrict = computed(() => user.value?.district || '')
 
-  function persist(nextUser, nextToken, nextType) {
+  function persist(nextUser, nextType) {
     user.value = nextUser
-    token.value = nextToken
+    token.value = 'cookie-session'
     userType.value = nextType
     localStorage.setItem('webUser', JSON.stringify(nextUser))
-    localStorage.setItem('webToken', nextToken)
     localStorage.setItem('webUserType', nextType)
   }
 
@@ -32,7 +32,7 @@ export const useUserStore = defineStore('user', () => {
         role: result.admin.role,
         district: result.admin.district
       }
-      persist(nextUser, result.token || `web_admin_${Date.now()}`, 'admin')
+      persist(nextUser, 'admin')
       return { success: true }
     } catch (error) {
       return { success: false, message: error.message || '用户名或密码错误' }
@@ -42,7 +42,7 @@ export const useUserStore = defineStore('user', () => {
   async function loginAsEnterprise(companyName, phone) {
     try {
       const result = await loginEnterprise(companyName, phone)
-      persist(result.enterprise, result.token || `web_enterprise_${Date.now()}`, 'enterprise')
+      persist(result.enterprise, 'enterprise')
       return { success: true }
     } catch (error) {
       return { success: false, message: error.message || '企业登录失败' }
@@ -52,14 +52,14 @@ export const useUserStore = defineStore('user', () => {
   async function registerAsEnterprise(payload) {
     try {
       const result = await registerEnterprise(payload)
-      persist(result.enterprise, result.token || `web_enterprise_${Date.now()}`, 'enterprise')
+      persist(result.enterprise, 'enterprise')
       return { success: true }
     } catch (error) {
       return { success: false, message: error.message || '企业注册失败' }
     }
   }
 
-  function logout() {
+  async function logout() {
     user.value = null
     token.value = ''
     userType.value = ''
@@ -68,20 +68,24 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('webUserType')
     localStorage.removeItem('adminUser')
     localStorage.removeItem('adminToken')
+    await logoutServerSession()
   }
 
-  function checkAuth() {
-    const savedUser = localStorage.getItem('webUser') || localStorage.getItem('adminUser')
-    const savedToken = localStorage.getItem('webToken') || localStorage.getItem('adminToken')
-    const savedType = localStorage.getItem('webUserType') || (localStorage.getItem('adminUser') ? 'admin' : '')
-
-    if (savedUser && savedToken && savedType) {
-      user.value = JSON.parse(savedUser)
-      token.value = savedToken
-      userType.value = savedType
+  async function checkAuth() {
+    const session = await getServerSession()
+    if (session?.user && session?.userType) {
+      persist(session.user, session.userType)
       return true
     }
 
+    user.value = null
+    token.value = ''
+    userType.value = ''
+    localStorage.removeItem('webUser')
+    localStorage.removeItem('webToken')
+    localStorage.removeItem('webUserType')
+    localStorage.removeItem('adminUser')
+    localStorage.removeItem('adminToken')
     return false
   }
 

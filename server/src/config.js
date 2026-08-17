@@ -79,7 +79,9 @@ module.exports = {
   jwt: {
     secret: configuredJwtSecret || 'replace-this-before-production',
     isDefaultSecret: !configuredJwtSecret,
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    cookieName: process.env.SESSION_COOKIE_NAME || 'pc_admin_session',
+    cookieMaxAgeMs: Number(process.env.SESSION_COOKIE_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000)
   },
   security: {
     authWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),

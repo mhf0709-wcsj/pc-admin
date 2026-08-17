@@ -152,8 +152,8 @@ function handleCommand(command) {
       confirmButtonText: '确认退出',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(() => {
-      userStore.logout()
+    }).then(async () => {
+      await userStore.logout()
       router.push('/login')
       ElMessage.success('已退出登录')
     }).catch(() => {})

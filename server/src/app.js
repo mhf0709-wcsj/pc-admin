@@ -27,6 +27,50 @@ function createRequestId(prefix = 'req') {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
 }
 
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: config.jwt.cookieMaxAgeMs
+  }
+}
+
+function setSessionCookie(res, token) {
+  res.cookie(config.jwt.cookieName, token, sessionCookieOptions())
+}
+
+function clearSessionCookie(res) {
+  const { maxAge, ...options } = sessionCookieOptions()
+  res.clearCookie(config.jwt.cookieName, options)
+}
+
+function buildSessionProfile(session) {
+  if (session.userType === 'enterprise') {
+    return {
+      userType: 'enterprise',
+      user: {
+        id: session.sub,
+        companyName: session.companyName || '',
+        phone: session.phone || '',
+        legalPerson: session.legalPerson || '',
+        district: session.district || ''
+      }
+    }
+  }
+
+  return {
+    userType: 'admin',
+    user: {
+      id: session.sub,
+      username: session.username || '',
+      role: session.role || 'admin',
+      district: session.district || ''
+    }
+  }
+}
+
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
@@ -53,6 +97,7 @@ app.use(cors({
   },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
   maxAge: 86400
 }))
 
@@ -98,7 +143,12 @@ function limitPublicActions(req, res, next) {
 }
 
 function requireSession(req) {
-  const session = readSessionFromRequest(req)
+  let session = null
+  try {
+    session = readSessionFromRequest(req)
+  } catch {
+    session = null
+  }
   if (!session) {
     const error = new Error('Unauthorized')
     error.statusCode = 401
@@ -115,12 +165,29 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+app.get('/api/session', (req, res, next) => {
+  try {
+    res.json({ success: true, ...buildSessionProfile(requireSession(req)) })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/session/logout', (req, res) => {
+  clearSessionCookie(res)
+  res.json({ success: true })
+})
+
 app.post('/api/admin/call', limitPublicActions, async (req, res, next) => {
   try {
     const action = String(req.body?.action || '').trim()
     const payload = req.body?.payload || {}
     const session = OPEN_ADMIN_ACTIONS.has(action) ? null : requireSession(req)
     const data = await handleAdminAction(action, payload, session)
+    if (OPEN_ADMIN_ACTIONS.has(action) && data?.token) {
+      setSessionCookie(res, data.token)
+      delete data.token
+    }
     res.json({ success: true, data, requestId: req.requestId })
   } catch (error) {
     next(error)

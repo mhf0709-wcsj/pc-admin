@@ -93,10 +93,10 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
   if (!userStore.isLoggedIn) {
-    userStore.checkAuth()
+    await userStore.checkAuth()
   }
 
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {

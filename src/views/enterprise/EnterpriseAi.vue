@@ -1573,11 +1573,6 @@ function triggerFileSelect() {
   fileInputRef.value?.click()
 }
 
-function getServerToken() {
-  if (typeof localStorage === 'undefined') return ''
-  return localStorage.getItem('webToken') || localStorage.getItem('adminToken') || ''
-}
-
 function blobToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
