@@ -3731,5 +3731,96 @@ onMounted(async () => {
     opacity: 1;
   }
 }
+/* Apple-inspired chat: preserve task feedback while removing decorative effects. */
+.chat-panel,
+.draft-panel,
+.queue-panel,
+.history-panel,
+.conflict-desk {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.chat-toolbar h3,
+.draft-head h3 {
+  color: var(--apple-ink);
+  font-family: var(--apple-display);
+  font-size: clamp(25px, 3vw, 34px);
+  letter-spacing: -0.04em;
+}
+
+.quick-prompt-card,
+.queue-card,
+.history-card,
+.draft-card,
+.conflict-item {
+  border-color: var(--apple-line);
+  background: #fff;
+  box-shadow: none;
+}
+
+.quick-prompt-card:hover:not(:disabled) {
+  transform: none;
+  border-color: var(--apple-blue);
+  box-shadow: none;
+}
+
+.queue-filter-group {
+  border-color: var(--apple-line);
+  background: var(--apple-parchment);
+}
+
+.queue-filter-btn {
+  background: transparent;
+  color: var(--apple-muted);
+}
+
+.queue-filter-btn.active {
+  background: var(--apple-blue);
+  color: #fff;
+}
+
+.message-avatar {
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.message-avatar.assistant {
+  background: var(--apple-ink);
+}
+
+.message-avatar.user {
+  background: var(--apple-blue);
+}
+
+.message-bubble,
+.assistant .message-bubble {
+  border: 1px solid var(--apple-line);
+  background: #fff;
+  box-shadow: none;
+}
+
+.user .message-bubble {
+  border-color: var(--apple-blue);
+  background: var(--apple-blue);
+  color: #fff;
+}
+
+.typing-card,
+.process-card,
+.job-raw-text,
+.raw-text-box,
+.site-photo-empty {
+  border: 1px solid var(--apple-line);
+  background: var(--apple-parchment);
+  box-shadow: none;
+}
+
+.queue-track-bar,
+.process-track-bar {
+  background: var(--apple-blue);
+}
 </style>
 

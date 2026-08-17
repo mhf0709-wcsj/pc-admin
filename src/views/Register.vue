@@ -192,4 +192,41 @@ async function handleRegister() {
     border-radius: 22px;
   }
 }
+
+.pg-register-page {
+  background: #f5f5f7;
+}
+
+.pg-register-card {
+  width: min(720px, calc(100vw - 40px));
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.pg-register-card .brand-mark {
+  border-radius: 10px;
+  background: #1d1d1f;
+}
+
+.pg-register-card .brand h1 {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.submit-btn {
+  height: 46px;
+  border-radius: 999px;
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .pg-register-card {
+    width: calc(100vw - 28px);
+    border-radius: 18px;
+  }
+}
 </style>

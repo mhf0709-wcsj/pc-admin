@@ -528,4 +528,37 @@ onUnmounted(() => {
     text-align: center;
   }
 }
+/* Make analytical panels read as a single Apple-style data canvas. */
+.filter-panel,
+.summary-card,
+.panel {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.summary-card {
+  min-height: 136px;
+}
+
+.summary-card strong {
+  color: var(--apple-ink);
+  font-family: var(--apple-display);
+  font-size: clamp(32px, 3vw, 46px);
+  letter-spacing: -0.04em;
+}
+
+.risk-metric,
+.risk-tip-box,
+.mobile-focus-card {
+  border: 1px solid var(--apple-line);
+  background: var(--apple-parchment);
+  box-shadow: none;
+}
+
+.risk-metric strong {
+  font-family: var(--apple-display);
+  letter-spacing: -0.04em;
+}
 </style>

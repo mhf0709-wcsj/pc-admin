@@ -1,105 +1,258 @@
+:root {
+  --apple-blue: #0066cc;
+  --apple-blue-focus: #0071e3;
+  --apple-blue-dark: #2997ff;
+  --apple-ink: #1d1d1f;
+  --apple-muted: #6e6e73;
+  --apple-line: rgba(0, 0, 0, 0.09);
+  --apple-canvas: #ffffff;
+  --apple-parchment: #f5f5f7;
+  --apple-dark: #272729;
+  --primary-color: var(--apple-blue);
+  --primary-gradient: var(--apple-blue);
+  --primary-soft: rgba(0, 102, 204, 0.1);
+  --success-color: #34c759;
+  --warning-color: #ff9f0a;
+  --danger-color: #ff453a;
+  --danger-soft: rgba(255, 69, 58, 0.1);
+  --text-main: var(--apple-ink);
+  --text-sub: var(--apple-muted);
+  --border-color: var(--apple-line);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --shadow-soft: none;
+  --shadow-float: none;
+  --radius-xl: 18px;
+  --radius-lg: 18px;
+  --radius-md: 11px;
+  --ease-apple: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
 html,
 body {
   width: 100%;
-  height: 100%;
-  font-family: 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
-  font-size: 14px;
-  color: #1f2937;
-  background: linear-gradient(180deg, #f4f7fb 0%, #eef3fb 100%);
+  min-height: 100%;
+  margin: 0;
+  color: var(--apple-ink);
+  background: var(--apple-parchment);
+  font-family: 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
-}
-
-:root {
-  --primary-color: #1e5eff;
-  --primary-gradient: linear-gradient(135deg, #205bff 0%, #3f8cff 100%);
-  --primary-soft: rgba(30, 94, 255, 0.08);
-  --success-color: #18a058;
-  --warning-color: #f59e0b;
-  --danger-color: #e5484d;
-  --danger-soft: rgba(229, 72, 77, 0.1);
-  --text-main: #0f172a;
-  --text-sub: #64748b;
-  --border-color: rgba(148, 163, 184, 0.18);
-  --card-bg: rgba(255, 255, 255, 0.86);
-  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.08);
-  --shadow-float: 0 24px 48px rgba(30, 94, 255, 0.08);
-  --radius-xl: 28px;
-  --radius-lg: 22px;
-  --radius-md: 16px;
 }
 
 #app {
   min-height: 100vh;
 }
 
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
 .page-header {
-  margin-bottom: 24px;
+  max-width: 1240px;
+  margin: 0 auto 32px;
 
   .page-title {
-    font-size: 32px;
+    margin: 0;
+    color: var(--apple-ink);
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    font-size: clamp(32px, 4vw, 46px);
     font-weight: 600;
-    color: var(--text-main);
+    letter-spacing: -0.035em;
+    line-height: 1.08;
   }
 
   .page-subtitle {
-    margin-top: 10px;
-    line-height: 1.7;
-    color: var(--text-sub);
-    font-size: 15px;
+    max-width: 700px;
+    margin: 12px 0 0;
+    color: var(--apple-muted);
+    font-size: 17px;
+    line-height: 1.47;
+    letter-spacing: -0.01em;
   }
 }
 
 .card-shell {
-  background: var(--card-bg);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(24px);
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: var(--apple-canvas);
+  box-shadow: none;
 }
 
-.el-menu {
-  border-right: none !important;
+.el-button {
+  min-height: 36px;
+  border-radius: 999px;
+  font-weight: 400;
+  transition: transform 160ms var(--ease-apple), background-color 160ms var(--ease-apple), border-color 160ms var(--ease-apple);
+
+  &:active {
+    transform: scale(0.95);
+  }
 }
 
 .el-button--primary {
-  background: var(--primary-gradient);
-  border: none;
-  box-shadow: 0 16px 32px rgba(30, 94, 255, 0.22);
+  border-color: var(--apple-blue);
+  background: var(--apple-blue);
+  box-shadow: none;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--apple-blue-focus);
+    background: var(--apple-blue-focus);
+    box-shadow: none;
+  }
 }
 
-.el-table {
-  --el-table-border-color: transparent;
-
-  .el-table__header {
-    th {
-      background-color: rgba(241, 245, 249, 0.82) !important;
-      color: var(--text-sub);
-      font-weight: 600;
-    }
-  }
+.el-button--default {
+  border-color: var(--apple-line);
+  background: var(--apple-canvas);
+  color: var(--apple-blue);
 }
 
 .el-input__wrapper,
 .el-select__wrapper,
-.el-card,
+.el-textarea__inner {
+  border: 1px solid var(--apple-line);
+  border-radius: 999px;
+  background: var(--apple-canvas) !important;
+  box-shadow: none !important;
+  transition: border-color 160ms var(--ease-apple), box-shadow 160ms var(--ease-apple);
+}
+
+.el-textarea__inner {
+  border-radius: 11px;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  border-color: var(--apple-blue-focus);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16) !important;
+}
+
+.el-dialog,
+.el-drawer {
+  border: 1px solid var(--apple-line);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: none;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
 .el-dialog {
-  border-radius: var(--radius-md);
+  border-radius: 18px;
+}
+
+.el-drawer {
+  border-radius: 18px 0 0 18px;
+}
+
+.el-table {
+  --el-table-border-color: transparent;
+  --el-table-header-bg-color: #f5f5f7;
+  --el-table-row-hover-bg-color: rgba(0, 102, 204, 0.045);
+  --el-table-bg-color: transparent;
+  --el-fill-color-lighter: #fafafc;
+  overflow: hidden;
+  border: 1px solid var(--apple-line);
+  border-radius: 12px;
+
+  .el-table__header th {
+    color: var(--apple-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .el-table__cell {
+    padding: 13px 0;
+  }
+}
+
+.el-tag {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.el-menu {
+  border-right: 0 !important;
+}
+
+/* Shared operational surfaces: data-dense pages keep the same quiet Apple utility-card grammar. */
+#app .toolbar,
+#app .table-panel,
+#app .filter-box,
+#app .filter-panel,
+#app .enterprise-card,
+#app .setting-card,
+#app .calendar-panel,
+#app .enterprise-ai-panel,
+#app .task-queue-panel {
+  border: 1px solid var(--apple-line) !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+#app .quick-chip,
+#app .summary-pill,
+#app .chip,
+#app .filter-chip {
+  border: 1px solid var(--apple-line) !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: var(--apple-muted) !important;
+  box-shadow: none !important;
+}
+
+#app .quick-chip.active,
+#app .filter-chip.active {
+  border-color: var(--apple-blue) !important;
+  background: var(--apple-blue) !important;
+  color: #fff !important;
+}
+
+#app .enterprise-card:hover {
+  transform: none !important;
+  border-color: rgba(0, 102, 204, 0.4) !important;
+  box-shadow: none !important;
+}
+
+#app .enterprise-card h3,
+#app .setting-card h3,
+#app .section-head h3 {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+#app .detail-item,
+#app .credit-code,
+#app .mobile-record-card,
+#app .mobile-enterprise-card,
+#app .mobile-work-card,
+#app .mobile-dashboard-card {
+  border-color: var(--apple-line) !important;
+  background: #fff !important;
+  box-shadow: none !important;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.7);
-  border-radius: 3px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(60, 60, 67, 0.28);
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-track {
@@ -109,7 +262,7 @@ body {
 @media (max-width: 900px) {
   html,
   body {
-    font-size: 14px;
+    font-size: 15px;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
   }
@@ -121,43 +274,42 @@ body {
   }
 
   .page-header {
-    margin-bottom: 16px;
+    margin-bottom: 22px;
 
     .page-title {
-      font-size: 25px;
-      line-height: 1.25;
+      font-size: 34px;
     }
 
     .page-subtitle {
-      margin-top: 7px;
-      font-size: 13px;
-      line-height: 1.65;
+      margin-top: 10px;
+      font-size: 15px;
     }
   }
 
   .card-shell {
-    border-radius: 20px;
+    border-radius: 16px;
   }
 
   .el-button {
-    min-height: 40px;
-    padding-inline: 14px;
+    min-height: 44px;
+    padding-inline: 16px;
   }
 
   .el-input__wrapper,
   .el-select__wrapper {
-    min-height: 42px;
+    min-height: 44px;
   }
 
   .el-message-box {
     width: calc(100vw - 28px) !important;
     max-width: 420px;
+    border-radius: 18px !important;
   }
 
   .el-dialog {
     width: calc(100vw - 20px) !important;
     margin: 10px auto !important;
-    border-radius: 20px;
+    border-radius: 18px;
   }
 
   .el-dialog__body {
@@ -169,43 +321,15 @@ body {
     width: min(100vw, 560px) !important;
   }
 
-  .el-table {
-    font-size: 13px;
-  }
-
   .el-date-editor,
   .el-select,
   .el-cascader {
     width: 100% !important;
   }
 
-  .el-form-item {
-    min-width: 0;
-  }
-
-  .el-pagination {
-    --el-pagination-button-width: 34px;
-    --el-pagination-button-height: 34px;
-  }
-
   .el-pagination {
     flex-wrap: wrap;
-    gap: 6px;
     justify-content: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-header .page-title {
-    font-size: 23px;
-  }
-
-  .el-button {
-    min-height: 42px;
-  }
-
-  .el-message {
-    width: calc(100vw - 28px) !important;
-    max-width: none !important;
+    gap: 6px;
   }
 }

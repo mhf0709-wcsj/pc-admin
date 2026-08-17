@@ -733,4 +733,23 @@ onMounted(() => {
     }
   }
 }
+/* Settings uses the same calm, high-contrast operational language. */
+.setting-card,
+.district-admin-card,
+.log-card {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.section-head {
+  border-bottom: 1px solid var(--apple-line);
+}
+
+.password-tip {
+  border: 1px solid #c6defa;
+  background: #f2f8ff;
+  color: #174a7c;
+}
 </style>

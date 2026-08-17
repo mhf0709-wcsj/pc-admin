@@ -634,4 +634,36 @@ onMounted(() => {
     flex: 1 1 45%;
   }
 }
+/* Apple-inspired operational surface overrides. */
+.toolbar,
+.table-panel {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.quick-chip,
+.summary-pill {
+  border: 1px solid var(--apple-line);
+  background: var(--apple-parchment);
+  box-shadow: none;
+}
+
+.quick-chip.active {
+  border-color: var(--apple-blue);
+  background: var(--apple-blue);
+  color: #fff;
+}
+
+.summary-pill strong {
+  color: var(--apple-ink);
+  font-family: var(--apple-display);
+}
+
+.mobile-record-card {
+  border-color: var(--apple-line);
+  background: #fff;
+  box-shadow: none;
+}
 </style>

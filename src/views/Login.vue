@@ -336,4 +336,119 @@ function goRegister() {
     font-size: 25px;
   }
 }
+
+/* Apple-inspired access surface: editorially quiet, with one action color. */
+.pg-login-page {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+
+  &::before {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 42vh;
+    content: '';
+    background: #f5f5f7;
+  }
+}
+
+.pg-login-card {
+  position: relative;
+  width: 460px;
+  padding: 52px 48px 44px;
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.brand {
+  gap: 14px;
+  margin-bottom: 42px;
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #1d1d1f;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.brand p {
+  color: var(--apple-muted);
+  letter-spacing: 0.08em;
+}
+
+.brand h1 {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.role-switch {
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--apple-line);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.role-switch button {
+  height: 42px;
+  border-radius: 999px;
+  color: var(--apple-muted);
+  font-weight: 400;
+}
+
+.role-switch button.active {
+  background: var(--apple-blue);
+  box-shadow: none;
+}
+
+.form-head h2 {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.form-head p {
+  color: var(--apple-muted);
+  font-size: 16px;
+}
+
+.auth-form .el-input__wrapper {
+  min-height: 52px;
+  border-radius: 999px;
+}
+
+.auth-btn {
+  height: 46px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.session-notice {
+  border-color: rgba(255, 159, 10, 0.3);
+  border-radius: 11px;
+  background: #fff8e9;
+}
+
+@media (max-width: 640px) {
+  .pg-login-page {
+    align-items: flex-start;
+    padding: 80px 18px 28px;
+  }
+
+  .pg-login-card {
+    width: 100%;
+    padding: 36px 24px 30px;
+    border-radius: 18px;
+  }
+}
 </style>

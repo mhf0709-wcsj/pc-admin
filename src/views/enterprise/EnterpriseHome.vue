@@ -474,4 +474,88 @@ onMounted(loadData)
     color: var(--text-sub);
   }
 }
+
+.summary-grid {
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.summary-card {
+  min-height: 142px;
+  padding: 22px;
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+
+  &.danger,
+  &.warning {
+    background: #fff;
+  }
+
+  strong {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    font-size: 44px;
+    font-weight: 600;
+    letter-spacing: -0.05em;
+  }
+}
+
+.calendar-panel,
+.panel {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.panel-head h3 {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.panel-head p,
+.calendar-meta,
+.mobile-work-card p,
+.mobile-work-card span {
+  color: var(--apple-muted);
+}
+
+.calendar-card,
+.mobile-work-card,
+.empty-block {
+  border: 1px solid var(--apple-line);
+  border-radius: 12px;
+  background: #fff;
+
+  &.expired,
+  &.danger {
+    border-color: rgba(255, 69, 58, 0.32);
+    background: #fff;
+  }
+}
+
+.calendar-date {
+  color: var(--apple-blue);
+  font-weight: 600;
+}
+
+.calendar-title {
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .summary-grid {
+    gap: 10px;
+  }
+
+  .summary-card {
+    min-height: 112px;
+    padding: 18px;
+
+    strong {
+      font-size: 38px;
+    }
+  }
+}
 </style>

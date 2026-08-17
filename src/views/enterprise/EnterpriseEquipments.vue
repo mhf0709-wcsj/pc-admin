@@ -253,4 +253,17 @@ onMounted(loadData)
     color: var(--text-sub);
   }
 }
+/* Equipment management follows the same mobile-first data surface. */
+.table-panel {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.mobile-device-card {
+  border-color: var(--apple-line);
+  background: #fff;
+  box-shadow: none;
+}
 </style>

@@ -487,4 +487,138 @@ onBeforeUnmount(() => {
     }
   }
 }
+
+/* Apple-inspired application chrome: dark global navigation and a quiet utility bar. */
+.main-layout {
+  gap: 0;
+  padding: 0;
+  background: var(--apple-parchment);
+}
+
+.sidebar {
+  width: 232px;
+  padding: 22px 14px;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  box-shadow: none;
+  backdrop-filter: none;
+
+  &.collapsed {
+    width: 76px;
+  }
+
+  .logo {
+    padding: 6px 10px 26px;
+  }
+
+  .logo-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: #fff;
+    color: #000;
+    box-shadow: none;
+  }
+
+  .logo-badge {
+    color: rgba(255, 255, 255, 0.52);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .logo-text {
+    color: #fff;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .el-menu .el-menu-item {
+    height: 44px;
+    margin: 3px 0;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.68) !important;
+    font-size: 13px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.12) !important;
+      color: #fff !important;
+    }
+  }
+
+  .el-menu :deep(.el-menu-item.is-active) {
+    border-left: 2px solid var(--apple-blue);
+    border-radius: 0 8px 8px 0;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #fff !important;
+    font-weight: 600;
+  }
+}
+
+.header {
+  min-height: 58px;
+  border: 0;
+  border-bottom: 1px solid var(--apple-line);
+  border-radius: 0;
+  background: rgba(245, 245, 247, 0.8);
+  box-shadow: none;
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.scope-chip {
+  height: 30px;
+  border: 1px solid var(--apple-line);
+  background: #fff;
+  color: var(--apple-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.user-info .avatar {
+  background: var(--apple-blue);
+}
+
+.content {
+  padding: 40px clamp(24px, 4vw, 64px) 48px;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: min(84vw, 292px);
+    border-radius: 0;
+    padding-top: 18px;
+  }
+
+  .header {
+    top: 0;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .mobile-menu-btn {
+    border-radius: 50%;
+    background: transparent;
+    color: var(--apple-ink);
+  }
+
+  .content {
+    padding: 28px 16px calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-bottom-nav {
+    border-top: 1px solid var(--apple-line);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: none;
+  }
+
+  .mobile-nav-item {
+    border-radius: 8px;
+    font-weight: 400;
+
+    &.router-link-active {
+      background: transparent;
+      color: var(--apple-blue);
+    }
+  }
+}
 </style>

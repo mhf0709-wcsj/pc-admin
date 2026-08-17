@@ -364,4 +364,47 @@ onMounted(loadEnterprises)
     align-items: flex-start;
   }
 }
+/* Keep enterprise status data visually quiet and scannable. */
+.summary-card,
+.enterprise-card,
+.filter-box,
+.empty-block {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.summary-card {
+  min-height: 138px;
+}
+
+.summary-card strong {
+  color: var(--apple-ink);
+  font-family: var(--apple-display);
+  font-size: clamp(32px, 3vw, 46px);
+  letter-spacing: -0.04em;
+}
+
+.detail-item,
+.credit-code {
+  border: 1px solid var(--apple-line);
+  background: var(--apple-parchment);
+}
+
+.chip {
+  border: 1px solid transparent;
+  background: #f5f5f7;
+  color: var(--apple-muted);
+}
+
+.chip.expired {
+  border-color: #ffd7d9;
+  background: #fff2f2;
+}
+
+.chip.expiring {
+  border-color: #f6dfb8;
+  background: #fff8ec;
+}
 </style>

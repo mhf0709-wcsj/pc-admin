@@ -395,4 +395,18 @@ onMounted(loadData)
     color: var(--text-sub);
   }
 }
+/* Gauge records remain dense but use neutral Apple-style layers. */
+.table-panel {
+  border: 1px solid var(--apple-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.photo-preview,
+.mobile-gauge-card {
+  border-color: var(--apple-line);
+  background: #fff;
+  box-shadow: none;
+}
 </style>
