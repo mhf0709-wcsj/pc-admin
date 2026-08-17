@@ -358,7 +358,7 @@ async function handleLogin(payload = {}) {
   }
 
   if (Number(admin.isDisabled || 0)) {
-    throw createServiceError('ACCOUNT_DISABLED', '璐﹀彿宸插仠鐢紝璇疯仈绯绘€荤鐞嗗憳', 403)
+    throw createServiceError('ACCOUNT_DISABLED', '账号已停用，请联系总管理员', 403)
   }
 
   await updateById('admins', admin.id, {
@@ -410,7 +410,7 @@ async function handleSaveDistrictAdmin(payload = {}, session) {
   const password = String(payload.password || '').trim()
 
   if (!username) throw new Error('请输入辖区管理员用户名')
-  if (!district) throw new Error('璇烽€夋嫨杈栧尯')
+  if (!district) throw new Error('请选择辖区')
   if (!id && password.length < 6) throw new Error('新建账号密码不能少于 6 位')
   if (password && password.length < 6) throw new Error('密码不能少于 6 位')
 
@@ -470,7 +470,7 @@ async function handleSaveDistrictAdminV2(payload = {}, session) {
   const isDisabled = toBool(payload.isDisabled)
 
   if (!username) throw createServiceError('VALIDATION_ERROR', '请输入辖区管理员用户名')
-  if (!district) throw createServiceError('VALIDATION_ERROR', '璇烽€夋嫨杈栧尯')
+  if (!district) throw createServiceError('VALIDATION_ERROR', '请选择辖区')
   if (!id && password.length < 6) throw createServiceError('VALIDATION_ERROR', '新建账号密码不能少于 6 位')
   if (password && password.length < 6) throw createServiceError('VALIDATION_ERROR', '密码不能少于 6 位')
 
@@ -538,7 +538,7 @@ async function handleGetDashboard(payload = {}, session) {
     const district = record.district || '未分配'
     districtMap.set(district, (districtMap.get(district) || 0) + 1)
 
-    const conclusion = record.conclusion || '鏈煡'
+    const conclusion = record.conclusion || '未知'
     conclusionMap.set(conclusion, (conclusionMap.get(conclusion) || 0) + 1)
 
     const expired = isExpiredDate(record.expiryDate)
@@ -772,7 +772,7 @@ async function handleEnterpriseLogin(payload = {}) {
   )
 
   if (!enterprise) {
-    throw new Error('浼佷笟鍚嶇О鎴栨墜鏈哄彿閿欒')
+    throw new Error('企业名称或手机号错误')
   }
 
   await updateById('enterprises', enterprise.id, {
@@ -991,7 +991,7 @@ async function handleDeleteEnterpriseEquipment(payload = {}, session) {
   const enterprise = assertEnterpriseSession(session)
   const companyName = buildEnterpriseScope(enterprise)
   const targetId = String(payload.id || '').trim()
-  if (!targetId) throw new Error('璁惧缂栧彿涓嶈兘涓虹┖')
+  if (!targetId) throw new Error('设备编号不能为空')
 
   return withTransaction(async (connection) => {
     const current = await one('SELECT * FROM equipments WHERE id = :id LIMIT 1', { id: targetId }, connection)
@@ -1118,7 +1118,7 @@ async function handleGetEnterpriseRecords(payload = {}, session) {
 
 async function handleSendReminderSms(payload = {}, session) {
   if (!session || !['admin', 'enterprise'].includes(session.userType)) {
-    const error = new Error('鐭俊鎻愰啋闇€瑕佺櫥褰曞悗浣跨敤')
+    const error = new Error('短信提醒需要登录后使用')
     error.statusCode = 401
     throw error
   }
@@ -1158,7 +1158,7 @@ async function handleUpdateEnterpriseRecordRemediation(payload = {}, session) {
 async function handleBatchSendReminderSms(payload = {}, session) {
   const admin = assertAdminSession(session)
   const ids = Array.isArray(payload.ids) ? payload.ids.map((id) => String(id).trim()).filter(Boolean) : []
-  if (!ids.length) throw createServiceError('VALIDATION_ERROR', '璇烽€夋嫨闇€瑕佸彂閫佹彁閱掔殑鍙拌处璁板綍')
+  if (!ids.length) throw createServiceError('VALIDATION_ERROR', '请选择需要发送提醒的台账记录')
 
   const scoped = buildAdminScope(admin)
   const records = await listRows('pressure_records', {
@@ -1166,7 +1166,7 @@ async function handleBatchSendReminderSms(payload = {}, session) {
     params: scoped.params
   })
   const selected = records.filter((item) => ids.includes(item.id))
-  if (!selected.length) throw createServiceError('RECORD_NOT_FOUND', '鏈壘鍒板彲鍙戦€佹彁閱掔殑璁板綍', 404)
+  if (!selected.length) throw createServiceError('RECORD_NOT_FOUND', '未找到可发送提醒的记录', 404)
 
   const enterpriseRows = await listRows('enterprises', scoped)
   const phoneMap = normalizeReminderRecords(selected, enterpriseRows)
@@ -1193,7 +1193,7 @@ async function handleUpdateRecord(payload = {}, session) {
   const id = String(payload.id || payload._id || '').trim()
   const data = payload.data || {}
   const note = String(payload.note || '').trim()
-  if (!id) throw createServiceError('VALIDATION_ERROR', '缂哄皯璁板綍缂栧彿')
+  if (!id) throw createServiceError('VALIDATION_ERROR', '缺少记录编号')
 
   const existing = await one('SELECT * FROM pressure_records WHERE id = :id AND isDeleted = 0 LIMIT 1', { id })
   if (!existing) throw createServiceError('RECORD_NOT_FOUND', '台账记录不存在', 404)
@@ -1225,7 +1225,7 @@ async function handleUpdateRecord(payload = {}, session) {
     }
   })
   if (!Object.keys(updateData).length) {
-    throw createServiceError('VALIDATION_ERROR', '娌℃湁鍙繚瀛樼殑淇敼鍐呭')
+    throw createServiceError('VALIDATION_ERROR', '没有可保存的修改内容')
   }
   updateData.updateTime = formatDateTime()
 
@@ -1252,7 +1252,7 @@ async function handleUpdateRecord(payload = {}, session) {
 async function handleGetRecordRevisionLogs(payload = {}, session) {
   const admin = assertAdminSession(session)
   const recordId = String(payload.recordId || payload.id || '').trim()
-  if (!recordId) throw createServiceError('VALIDATION_ERROR', '缂哄皯璁板綍缂栧彿')
+  if (!recordId) throw createServiceError('VALIDATION_ERROR', '缺少记录编号')
 
   const record = await one('SELECT * FROM pressure_records WHERE id = :id LIMIT 1', { id: recordId })
   if (!record) throw createServiceError('RECORD_NOT_FOUND', '台账记录不存在', 404)
@@ -1448,7 +1448,7 @@ async function handleSaveEnterpriseAiRecord(payload = {}, session) {
   return withTransaction(async (connection) => {
     const equipment = await one('SELECT * FROM equipments WHERE id = :id LIMIT 1', { id: equipmentId }, connection)
     if (!equipment || equipment.isDeleted) {
-      throw new Error('鎵€灞炶澶囦笉瀛樺湪')
+      throw new Error('所属设备不存在')
     }
     if (equipment.enterpriseName !== companyName) {
       throw new Error('鏃犳潈淇濆瓨鍒拌璁惧')

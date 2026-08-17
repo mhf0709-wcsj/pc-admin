@@ -14,6 +14,9 @@ function loadEnvFile(filename, override = false) {
 loadEnvFile('.env')
 loadEnvFile('.env.local', true)
 
+const isProduction = process.env.NODE_ENV === 'production'
+const configuredJwtSecret = String(process.env.JWT_SECRET || '').trim()
+
 function splitOrigins(value) {
   return String(value || '')
     .split(',')
@@ -22,6 +25,7 @@ function splitOrigins(value) {
 }
 
 module.exports = {
+  isProduction,
   host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 3001),
   corsOrigins: splitOrigins(process.env.CORS_ORIGIN),
@@ -73,8 +77,15 @@ module.exports = {
     templateCode: process.env.SMS_TEMPLATE_CODE || ''
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'replace-this-before-production',
+    secret: configuredJwtSecret || 'replace-this-before-production',
+    isDefaultSecret: !configuredJwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+  },
+  security: {
+    authWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+    authLimit: Number(process.env.AUTH_RATE_LIMIT_MAX || 10),
+    registrationWindowMs: Number(process.env.REGISTRATION_RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000),
+    registrationLimit: Number(process.env.REGISTRATION_RATE_LIMIT_MAX || 5)
   },
   seed: {
     adminUsername: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
