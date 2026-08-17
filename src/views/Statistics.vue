@@ -453,7 +453,7 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .filter-panel,
   .summary-grid,
   .content-grid,

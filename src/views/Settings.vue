@@ -101,6 +101,31 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div v-loading="districtAdminLoading" class="mobile-admin-list">
+        <article v-for="row in districtAdmins" :key="row.id || row.username" class="mobile-admin-card">
+          <div class="mobile-admin-head">
+            <div>
+              <strong>{{ row.username }}</strong>
+              <span>{{ row.district || '未分配辖区' }}</span>
+            </div>
+            <el-tag :type="row.isDisabled ? 'danger' : 'success'" size="small">
+              {{ row.isDisabled ? '已停用' : '启用中' }}
+            </el-tag>
+          </div>
+          <dl class="mobile-info-grid">
+            <div><dt>最近登录</dt><dd>{{ row.lastLoginTime || '从未登录' }}</dd></div>
+            <div><dt>最近更新</dt><dd>{{ row.updateTime || row.createTime || '-' }}</dd></div>
+          </dl>
+          <div class="mobile-admin-actions">
+            <el-button @click="openAdminDialog(row)">编辑账号</el-button>
+            <el-button :type="row.isDisabled ? 'success' : 'warning'" plain @click="toggleDistrictAdmin(row)">
+              {{ row.isDisabled ? '启用账号' : '停用账号' }}
+            </el-button>
+          </div>
+        </article>
+        <el-empty v-if="!districtAdminLoading && !districtAdmins.length" description="暂无辖区管理员" :image-size="76" />
+      </div>
     </section>
 
     <section v-if="userStore.isAdmin" class="setting-card log-card card-shell">
@@ -170,6 +195,26 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div v-loading="logLoading" class="mobile-log-list">
+        <article v-for="row in operationLogs" :key="row.id || `${row.createTime}-${row.action}`" class="mobile-log-card">
+          <div class="mobile-log-head">
+            <el-tag size="small">{{ formatLogCategory(row.category) }}</el-tag>
+            <el-tag :type="row.success ? 'success' : 'danger'" size="small">
+              {{ row.success ? '成功' : '失败' }}
+            </el-tag>
+            <time>{{ row.createTime || '-' }}</time>
+          </div>
+          <strong>{{ row.action || '-' }}</strong>
+          <p>{{ row.message || row.errorCode || '无补充说明' }}</p>
+          <div class="mobile-log-meta">
+            <span>操作人：{{ row.operatorName || row.operatorId || '-' }}</span>
+            <span>目标：{{ formatLogTarget(row) }}</span>
+            <span>耗时：{{ formatDuration(row.durationMs) }}</span>
+          </div>
+        </article>
+        <el-empty v-if="!logLoading && !operationLogs.length" description="暂无操作日志" :image-size="76" />
+      </div>
 
       <div class="pagination-wrap">
         <el-pagination
@@ -505,6 +550,11 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+.mobile-admin-list,
+.mobile-log-list {
+  display: none;
+}
+
 :deep(.el-select) {
   width: 100%;
 }
@@ -517,6 +567,170 @@ onMounted(() => {
 
   .section-head {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 900px) {
+  .setting-card {
+    padding: 18px;
+
+    h3 {
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+  }
+
+  .section-head {
+    gap: 12px;
+
+    :deep(.el-button) {
+      width: 100%;
+    }
+  }
+
+  .district-admin-card > :deep(.el-table),
+  .log-card > :deep(.el-table) {
+    display: none;
+  }
+
+  .mobile-admin-list,
+  .mobile-log-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-admin-card,
+  .mobile-log-card {
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: rgba(248, 250, 252, 0.76);
+  }
+
+  .mobile-admin-head,
+  .mobile-log-head,
+  .mobile-admin-actions {
+    display: flex;
+    align-items: center;
+  }
+
+  .mobile-admin-head {
+    justify-content: space-between;
+    gap: 12px;
+
+    strong,
+    span {
+      display: block;
+    }
+
+    strong {
+      color: var(--text-main);
+      font-size: 16px;
+    }
+
+    span {
+      margin-top: 4px;
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+  }
+
+  .mobile-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0;
+
+    div {
+      min-width: 0;
+      padding: 10px;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    dt {
+      color: var(--text-sub);
+      font-size: 11px;
+    }
+
+    dd {
+      margin: 5px 0 0;
+      overflow: hidden;
+      color: var(--text-main);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .mobile-admin-actions {
+    gap: 10px;
+
+    :deep(.el-button) {
+      flex: 1;
+      margin-left: 0;
+    }
+  }
+
+  .mobile-log-head {
+    flex-wrap: wrap;
+    gap: 6px;
+
+    time {
+      margin-left: auto;
+      color: var(--text-sub);
+      font-size: 12px;
+    }
+  }
+
+  .mobile-log-card {
+    strong {
+      display: block;
+      margin-top: 12px;
+      color: var(--text-main);
+      font-size: 15px;
+    }
+
+    p {
+      margin-top: 6px;
+      color: var(--text-sub);
+      line-height: 1.6;
+    }
+  }
+
+  .mobile-log-meta {
+    display: grid;
+    gap: 4px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    color: var(--text-sub);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .pagination-wrap {
+    justify-content: center;
+  }
+
+  :deep(.el-form) {
+    .el-form-item {
+      margin-bottom: 17px;
+    }
+
+    .el-form-item__label {
+      float: none;
+      display: block;
+      width: auto !important;
+      height: auto;
+      line-height: 1.4;
+      margin-bottom: 7px;
+      text-align: left;
+    }
+
+    .el-form-item__content {
+      margin-left: 0 !important;
+    }
   }
 }
 </style>

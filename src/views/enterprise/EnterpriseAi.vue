@@ -3611,7 +3611,7 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .chat-panel,
   .draft-panel {
     padding: 16px;

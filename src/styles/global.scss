@@ -12,6 +12,7 @@ body {
   font-size: 14px;
   color: #1f2937;
   background: linear-gradient(180deg, #f4f7fb 0%, #eef3fb 100%);
+  -webkit-text-size-adjust: 100%;
 }
 
 :root {
@@ -110,6 +111,13 @@ body {
   body {
     font-size: 14px;
     overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
   }
 
   .page-header {
@@ -133,6 +141,7 @@ body {
 
   .el-button {
     min-height: 40px;
+    padding-inline: 14px;
   }
 
   .el-input__wrapper,
@@ -164,9 +173,39 @@ body {
     font-size: 13px;
   }
 
+  .el-date-editor,
+  .el-select,
+  .el-cascader {
+    width: 100% !important;
+  }
+
+  .el-form-item {
+    min-width: 0;
+  }
+
+  .el-pagination {
+    --el-pagination-button-width: 34px;
+    --el-pagination-button-height: 34px;
+  }
+
   .el-pagination {
     flex-wrap: wrap;
     gap: 6px;
     justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header .page-title {
+    font-size: 23px;
+  }
+
+  .el-button {
+    min-height: 42px;
+  }
+
+  .el-message {
+    width: calc(100vw - 28px) !important;
+    max-width: none !important;
   }
 }

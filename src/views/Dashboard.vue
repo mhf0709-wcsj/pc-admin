@@ -552,7 +552,7 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .summary-grid,
   .content-grid {
     grid-template-columns: 1fr;

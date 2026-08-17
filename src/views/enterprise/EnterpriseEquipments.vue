@@ -173,7 +173,7 @@ onMounted(loadData)
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .action-header,
   .toolbar {
     flex-direction: column;

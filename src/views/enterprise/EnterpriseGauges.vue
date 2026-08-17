@@ -291,7 +291,7 @@ onMounted(loadData)
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .toolbar,
   .remediation-cell {
     grid-template-columns: 1fr;
